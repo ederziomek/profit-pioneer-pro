@@ -183,3 +183,209 @@ export function computeAll(dataset: Dataset) {
 
   return { cohorts, affiliates, totals, suspicious };
 }
+
+// ================= Cohorts V2 (anchor = first transaction) =================
+export type { CohortSummaryV2, CohortGranularity } from "@/types/analytics";
+
+const TZ = "America/Sao_Paulo";
+
+const startOfDayTZ = (d: Date) => fromZonedTime(startOfDay(toZonedTime(d, TZ)), TZ);
+const startOfWeekTZ = (d: Date) => fromZonedTime(startOfWeek(toZonedTime(d, TZ), { weekStartsOn: 1 }), TZ);
+const startOfMonthTZ = (d: Date) => fromZonedTime(startOfMonth(toZonedTime(d, TZ)), TZ);
+
+const periodStartFor = (d: Date, granularity: CohortGranularity) => {
+  switch (granularity) {
+    case "day":
+      return startOfDayTZ(d);
+    case "week":
+      return startOfWeekTZ(d);
+    case "month":
+      return startOfMonthTZ(d);
+  }
+};
+
+export function computeCohortsV2(dataset: Dataset, granularity: CohortGranularity) {
+  const { transactions: txRaw, payments: pyRaw } = dataset;
+  const tx = txRaw.map((t) => ({ ...t, date: new Date(t.date as any) }));
+  const py = pyRaw.map((p) => ({ ...p, date: new Date(p.date as any) }));
+
+  // First transaction (anchor) per customer
+  const anchorByCustomer = new Map<string, Date>();
+  tx.forEach((t) => {
+    const prev = anchorByCustomer.get(t.customer_id);
+    if (!prev || t.date.getTime() < prev.getTime()) anchorByCustomer.set(t.customer_id, t.date);
+  });
+
+  // Aggregate transactions per customer (from anchor -> today)
+  const aggTxByCustomer = new Map<string, { deposits: number; withdrawals: number; ggr: number; chargeback: number; ngr: number }>();
+  const today = new Date();
+  tx.forEach((t) => {
+    const anchor = anchorByCustomer.get(t.customer_id);
+    if (!anchor) return;
+    if (t.date.getTime() < anchor.getTime() || t.date.getTime() > today.getTime()) return;
+    const a = aggTxByCustomer.get(t.customer_id) ?? { deposits: 0, withdrawals: 0, ggr: 0, chargeback: 0, ngr: 0 };
+    a.deposits += t.deposit;
+    a.withdrawals += t.withdrawal;
+    a.ggr += t.ggr;
+    a.chargeback += t.chargeback;
+    a.ngr += (t.ggr - t.chargeback) * 0.8;
+    aggTxByCustomer.set(t.customer_id, a);
+  });
+
+  // Payments per customer (finish) within [anchor, today]
+  const cpaByCustomer = new Map<string, number>();
+  const revByCustomer = new Map<string, number>();
+  py.forEach((p) => {
+    if (p.status !== "finish" || !p.clientes_id) return;
+    const anchor = anchorByCustomer.get(p.clientes_id);
+    if (!anchor) return;
+    if (p.date.getTime() < anchor.getTime() || p.date.getTime() > today.getTime()) return;
+    if (p.method === "cpa") cpaByCustomer.set(p.clientes_id, (cpaByCustomer.get(p.clientes_id) ?? 0) + p.value);
+    if (p.method === "rev") revByCustomer.set(p.clientes_id, (revByCustomer.get(p.clientes_id) ?? 0) + p.value);
+  });
+
+  // Group by period start
+  type Row = ReturnType<typeof buildEmptyRow>;
+  const map = new Map<number, Row>();
+
+  function buildEmptyRow(periodStart: Date) {
+    return {
+      granularity,
+      periodStart,
+      customers: 0,
+      deposits: 0,
+      withdrawals: 0,
+      ggr: 0,
+      chargeback: 0,
+      ngr_total: 0,
+      cpa_pago: 0,
+      rev_pago: 0,
+      pago_total: 0,
+      ltv_total: 0,
+      lucro: 0,
+      roi: null as number | null,
+      tempo: 0,
+      breakeven_periods: null as number | null,
+    };
+  }
+
+  anchorByCustomer.forEach((anchor, cid) => {
+    const periodStart = periodStartFor(anchor, granularity);
+    const key = periodStart.getTime();
+    const row = map.get(key) ?? buildEmptyRow(periodStart);
+    row.customers += 1;
+
+    const agg = aggTxByCustomer.get(cid) ?? { deposits: 0, withdrawals: 0, ggr: 0, chargeback: 0, ngr: 0 };
+    row.deposits += agg.deposits;
+    row.withdrawals += agg.withdrawals;
+    row.ggr += agg.ggr;
+    row.chargeback += agg.chargeback;
+    row.ngr_total += agg.ngr;
+
+    const cpa = cpaByCustomer.get(cid) ?? 0;
+    const rev = revByCustomer.get(cid) ?? 0;
+    row.cpa_pago += cpa;
+    row.rev_pago += rev;
+    row.pago_total += cpa + rev;
+    row.ltv_total += agg.ngr;
+    row.lucro += agg.ngr - (cpa + rev);
+
+    map.set(key, row);
+  });
+
+  // Finalize rows: ROI and tempo
+  const todayTZ = startOfDayTZ(today);
+  const rows = Array.from(map.values()).map((r) => {
+    const psTZ = r.periodStart; // already in UTC representing TZ boundary
+    if (r.pago_total > 0) r.roi = r.ngr_total / r.pago_total - 1;
+    else r.roi = null;
+    if (granularity === "day") r.tempo = Math.max(0, differenceInDays(toZonedTime(todayTZ, TZ), toZonedTime(psTZ, TZ)));
+    if (granularity === "week") r.tempo = Math.max(0, differenceInWeeks(toZonedTime(todayTZ, TZ), toZonedTime(psTZ, TZ)));
+    if (granularity === "month") r.tempo = Math.max(0, differenceInMonths(toZonedTime(todayTZ, TZ), toZonedTime(psTZ, TZ)));
+    return r;
+  });
+
+  rows.sort((a, b) => a.periodStart.getTime() - b.periodStart.getTime());
+  return rows;
+}
+
+// ================ Affiliates totals with optional activity filter ================
+import type { AffiliatePaidSummary } from "@/types/analytics";
+
+export function computeAffiliatesPaid(dataset: Dataset, dateRange?: { start: Date; end: Date }): AffiliatePaidSummary[] {
+  const { transactions: txRaw, payments: pyRaw } = dataset;
+  const tx = txRaw.map((t) => ({ ...t, date: new Date(t.date as any) }));
+  const py = pyRaw.map((p) => ({ ...p, date: new Date(p.date as any) }));
+
+  // NGR per customer
+  const ngrByCustomer = new Map<string, number>();
+  tx.forEach((t) => {
+    const ngr = (t.ggr - t.chargeback) * 0.8;
+    ngrByCustomer.set(t.customer_id, (ngrByCustomer.get(t.customer_id) ?? 0) + ngr);
+  });
+
+  // Attribute customer to latest CPA finish
+  const latestCpaByCustomer = new Map<string, Payment>();
+  py.forEach((p) => {
+    if (p.status === "finish" && p.method === "cpa" && p.clientes_id) {
+      const prev = latestCpaByCustomer.get(p.clientes_id);
+      if (!prev || prev.date.getTime() < p.date.getTime()) latestCpaByCustomer.set(p.clientes_id, p);
+    }
+  });
+
+  // Aggregate per affiliate totals (anchor->today)
+  type Agg = { customers: Set<string>; ngr: number; cpa: number; rev: number };
+  const aggByAffiliate = new Map<string, Agg>();
+
+  // Initialize customer sets by attribution
+  latestCpaByCustomer.forEach((pay, cid) => {
+    const a = aggByAffiliate.get(pay.afiliados_id) ?? { customers: new Set<string>(), ngr: 0, cpa: 0, rev: 0 };
+    a.customers.add(cid);
+    a.ngr += ngrByCustomer.get(cid) ?? 0;
+    aggByAffiliate.set(pay.afiliados_id, a);
+  });
+
+  // Sum payments finish by affiliate
+  py.forEach((p) => {
+    if (p.status !== "finish") return;
+    const a = aggByAffiliate.get(p.afiliados_id) ?? { customers: new Set<string>(), ngr: 0, cpa: 0, rev: 0 };
+    if (p.method === "cpa") a.cpa += p.value;
+    if (p.method === "rev") a.rev += p.value;
+    aggByAffiliate.set(p.afiliados_id, a);
+  });
+
+  // Optional date filter: show affiliates with activity in interval only
+  let allowed: Set<string> | null = null;
+  if (dateRange) {
+    const { start, end } = dateRange;
+    const hasActivity = new Set<string>();
+
+    // Payments activity
+    py.forEach((p) => {
+      if (p.date >= start && p.date <= end) hasActivity.add(p.afiliados_id);
+    });
+
+    // Transactions activity by attributed customers
+    const affByCustomer = new Map<string, string>();
+    latestCpaByCustomer.forEach((p, cid) => affByCustomer.set(cid, p.afiliados_id));
+    tx.forEach((t) => {
+      if (t.date >= start && t.date <= end) {
+        const aff = affByCustomer.get(t.customer_id);
+        if (aff) hasActivity.add(aff);
+      }
+    });
+
+    allowed = hasActivity;
+  }
+
+  const result: AffiliatePaidSummary[] = [];
+  aggByAffiliate.forEach((v, afiliados_id) => {
+    if (allowed && !allowed.has(afiliados_id)) return;
+    const total_recebido = v.cpa + v.rev;
+    const roi = total_recebido > 0 ? v.ngr / total_recebido - 1 : null;
+    result.push({ afiliados_id, customers: v.customers.size, ngr_total: v.ngr, cpa_pago: v.cpa, rev_pago: v.rev, total_recebido, roi });
+  });
+
+  result.sort((a, b) => b.ngr_total - a.ngr_total);
+  return result;
+}
