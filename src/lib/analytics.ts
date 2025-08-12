@@ -5,7 +5,13 @@ import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 const parseDate = (v: any): Date => {
   if (v instanceof Date) return v;
-  if (typeof v === "number") return XLSX.SSF.parse_date_code(v) ? new Date(Date.UTC(v, 0, 1)) : new Date(v);
+  if (typeof v === "number") {
+    const d = (XLSX.SSF as any).parse_date_code?.(v);
+    if (d && typeof d.y === "number") {
+      return new Date(Date.UTC(d.y, (d.m || 1) - 1, d.d || 1, d.H || 0, d.M || 0, Math.floor(d.S || 0)));
+    }
+    return new Date(v);
+  }
   if (typeof v === "string") {
     const d = new Date(v);
     if (!isNaN(d.getTime())) return d;
@@ -169,15 +175,15 @@ export function computeAll(dataset: Dataset) {
 
   affiliates.sort((a, b) => b.ngr_total - a.ngr_total);
 
-  // Totais gerais
-  const totalCustomers = new Set<string>(transactions.map((t) => t.customer_id)).size;
-  const cac_cpa_total = cpaPayments.reduce((s, p) => s + p.value, 0);
-  const ltv_total = Array.from(ngrByCustomer.values()).reduce((s, v) => s + v, 0);
-  const rev_total = affiliates.reduce((s, a) => s + a.rev_calculado, 0);
-  const cac_total = cac_cpa_total + rev_total;
-  const roi = cac_total > 0 ? (ltv_total - cac_total) / cac_total : 0;
+// Totais gerais
+const totalCustomers = new Set<string>(transactions.map((t) => t.customer_id)).size;
+const cac_cpa_total = payments.filter((p) => p.status === "finish" && p.method === "cpa").reduce((s, p) => s + p.value, 0);
+const ltv_total = Array.from(ngrByCustomer.values()).reduce((s, v) => s + v, 0);
+const rev_total = payments.filter((p) => p.status === "finish" && p.method === "rev").reduce((s, p) => s + p.value, 0);
+const cac_total = cac_cpa_total + rev_total;
+const roi = cac_total > 0 ? (ltv_total - cac_total) / cac_total : 0;
 
-  const totals = { totalCustomers, cacTotal: cac_total, ltvTotal: ltv_total, roi };
+const totals = { totalCustomers, cacTotal: cac_total, ltvTotal: ltv_total, roi };
 
   const suspicious = affiliates.filter((a) => a.score >= 51).sort((a, b) => b.score - a.score).slice(0, 20);
 

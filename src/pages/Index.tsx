@@ -4,14 +4,15 @@ import { useAnalytics } from "@/context/AnalyticsContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { format } from "date-fns";
-
+import { computeCohortsV2 } from "@/lib/analytics";
 const Index = () => {
-  const { totals, cohorts, importPayments, importTransactions } = useAnalytics();
+const { totals, cohorts, importPayments, importTransactions, dataset } = useAnalytics();
 
-  const chartData = cohorts.map((c) => ({
-    name: format(c.weekStart, "dd/MM"),
-    roi: Number((c.roi * 100).toFixed(1)),
-  }));
+const rows = dataset ? computeCohortsV2(dataset, "week") : [];
+const chartData = rows.map((r) => ({
+  name: format(r.periodStart, "dd/MM"),
+  roi: r.roi == null ? 0 : Number(((r.roi) * 100).toFixed(1)),
+}));
 
   return (
     <div className="space-y-8">
