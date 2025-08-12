@@ -3,6 +3,7 @@ import SEO from "@/components/SEO";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import DataUploader from "@/components/import/DataUploader";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfWeek, format } from "date-fns";
@@ -13,7 +14,7 @@ const Database: React.FC = () => {
   const [pyCount, setPyCount] = React.useState<number>(0);
   const [txWeeks, setTxWeeks] = React.useState<string[]>([]);
   const [pyWeeks, setPyWeeks] = React.useState<string[]>([]);
-  const { importTransactions, importPayments } = useAnalytics();
+  const { importTransactions, importPayments, reset } = useAnalytics();
   const [loading, setLoading] = React.useState(false);
 
   const fetchMeta = React.useCallback(async () => {
@@ -117,6 +118,35 @@ const Database: React.FC = () => {
               onTransactions={async (f) => { await importTransactions(f); await fetchMeta(); }}
               onPayments={async (f) => { await importPayments(f); await fetchMeta(); }}
             />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section>
+        <Card className="shadow-soft border-destructive">
+          <CardHeader>
+            <CardTitle>Zona de Risco</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">Zerar banco de dados</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Tem certeza que deseja apagar todos os dados?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação removerá todas as linhas de Transações e Pagamentos. Você poderá importar novamente as planilhas em seguida.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction asChild>
+                    <Button variant="destructive" onClick={() => { reset(); setTimeout(() => fetchMeta(), 600); }}>Apagar tudo</Button>
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
       </section>
