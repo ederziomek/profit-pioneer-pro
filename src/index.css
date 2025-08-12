@@ -51,6 +51,10 @@
     --topbar-accent: 181 60% 40%;
     --topbar-border: 181 40% 32%;
 
+    /* Feedback */
+    --success: 142 70% 45%;
+    --success-foreground: 210 40% 98%;
+
     /* Extended tokens */
     --brand: 258 85% 54%;
     --brand-2: 280 85% 60%;
@@ -108,6 +112,10 @@
     --topbar-foreground: 180 15% 96%;
     --topbar-accent: 181 62% 42%;
     --topbar-border: 181 42% 33%;
+
+    /* Feedback */
+    --success: 142 65% 42%;
+    --success-foreground: 210 40% 98%;
 
     --brand: 258 85% 62%;
     --brand-2: 280 85% 64%;

@@ -19,8 +19,8 @@ const DataUploader: React.FC<Props> = ({
       const f = e.target.files?.[0];
       if (f) onPayments(f);
     }} />
-      <Button variant="hero" onClick={() => txRef.current?.click()} className="text-slate-50 bg-violet-950 hover:bg-violet-800 rounded">Importar Transações</Button>
-      <Button variant="premium" onClick={() => pyRef.current?.click()} className="text-slate-50 bg-violet-950 hover:bg-violet-800">Importar Pagamentos</Button>
+      <Button variant="topbar" onClick={() => txRef.current?.click()}>Importar Transações</Button>
+      <Button variant="topbar" onClick={() => pyRef.current?.click()}>Importar Pagamentos</Button>
     </div>;
 };
 export default DataUploader;

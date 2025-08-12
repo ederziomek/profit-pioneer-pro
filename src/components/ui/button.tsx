@@ -22,6 +22,8 @@ const buttonVariants = cva(
           "bg-hero-gradient text-primary-foreground shadow-glow hover:opacity-95",
         premium:
           "bg-primary/10 text-primary border border-primary/20 hover:bg-primary/15",
+        topbar:
+          "bg-topbar-accent text-topbar-foreground hover:bg-topbar-accent/90",
       },
       size: {
         default: "h-10 px-4 py-2",

@@ -2,11 +2,11 @@ import SEO from "@/components/SEO";
 import DataUploader from "@/components/import/DataUploader";
 import { useAnalytics } from "@/context/AnalyticsContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
 import { format } from "date-fns";
 import { computeCohortsV2 } from "@/lib/analytics";
 const Index = () => {
-const { totals, cohorts, importPayments, importTransactions, dataset } = useAnalytics();
+const { totals, cohorts, affiliates, importPayments, importTransactions, dataset } = useAnalytics();
 
 const rows = dataset ? computeCohortsV2(dataset, "week") : [];
 const chartData = rows.map((r) => ({
@@ -21,17 +21,21 @@ const chartData = rows.map((r) => ({
       <section className="rounded-xl p-8 bg-hero-gradient text-primary-foreground shadow-glow hover:tilt">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-semibold">Dashboard — IG Afiliados Analytics</h1>
+            <h1 className="text-3xl font-semibold text-muted-foreground">Dashboard — IG Afiliados Analytics</h1>
             <p className="opacity-90">Carregue as planilhas de Transações e Pagamentos para iniciar as análises.</p>
           </div>
           <DataUploader onTransactions={importTransactions} onPayments={importPayments} />
         </div>
       </section>
 
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="shadow-soft">
           <CardHeader><CardTitle>Total Clientes</CardTitle></CardHeader>
           <CardContent className="text-3xl font-semibold">{totals ? totals.totalCustomers.toLocaleString() : "—"}</CardContent>
+        </Card>
+        <Card className="shadow-soft">
+          <CardHeader><CardTitle>Afiliados</CardTitle></CardHeader>
+          <CardContent className="text-3xl font-semibold">{affiliates.length.toLocaleString()}</CardContent>
         </Card>
         <Card className="shadow-soft">
           <CardHeader><CardTitle>CAC Total (R$)</CardTitle></CardHeader>
@@ -60,7 +64,11 @@ const chartData = rows.map((r) => ({
                   <XAxis dataKey="name" />
                   <YAxis unit="%" />
                   <Tooltip formatter={(v: any) => `${v}%`} />
-                  <Bar dataKey="roi" fill="hsl(var(--primary))" />
+                  <Bar dataKey="roi">
+                    {chartData.map((d, idx) => (
+                      <Cell key={`roi-${idx}`} fill={d.roi >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
