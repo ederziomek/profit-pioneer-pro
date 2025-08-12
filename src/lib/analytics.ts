@@ -3,6 +3,35 @@ import { parse, startOfWeek, startOfDay, startOfMonth, differenceInDays, differe
 import type { Payment, Transaction, Dataset, CohortSummary, AffiliateSummary, CohortSummaryV2, CohortGranularity } from "@/types/analytics";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
+// Helpers: normalize headers and parse numbers in pt-BR
+const normalizeKey = (k: any) =>
+  String(k ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+const normalizeRow = (row: any) => {
+  const out: Record<string, any> = {};
+  Object.keys(row ?? {}).forEach((k) => {
+    out[normalizeKey(k)] = row[k];
+  });
+  return out;
+};
+const toNumberBR = (v: any): number => {
+  if (v == null) return 0;
+  if (typeof v === "number" && isFinite(v)) return v;
+  if (typeof v === "string") {
+    const s = v
+      .replace(/[^0-9,.-]/g, "")
+      .replace(/\.(?=\d{3}(\D|$))/g, "") // remove thousand dots
+      .replace(/,(\d{1,2})$/, ".$1"); // decimal comma -> dot
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+  return 0;
+};
+
 const parseDate = (v: any): Date => {
   if (v instanceof Date) return v;
   if (typeof v === "number") {
@@ -24,32 +53,40 @@ export async function parseTransactionsFile(file: File): Promise<Transaction[]> 
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<any>(ws, { defval: null });
-  return rows.map((r) => ({
-    customer_id: String(r.customer_id ?? r.clientes_id ?? r.cliente_id ?? r["clientes_id"]).trim(),
-    date: parseDate(r.date ?? r.data),
-    ggr: Number(r.ggr ?? 0),
-    chargeback: Number(r.chargeback ?? 0),
-    deposit: Number(r.deposit ?? r.deposito ?? 0),
-    withdrawal: Number(r.withdrawal ?? r.saque ?? 0),
-  }));
+  const rows = XLSX.utils.sheet_to_json<any>(ws, { defval: null, raw: true });
+  const mapped = rows.map((r) => {
+    const n = normalizeRow(r);
+    const cid = n.customer_id ?? n.clientes_id ?? n.cliente_id ?? n.cliente ?? n.id_cliente ?? n.id;
+    return {
+      customer_id: String(cid ?? "").trim(),
+      date: parseDate(n.date ?? n.data ?? n.created_at ?? n.dt ?? null),
+      ggr: toNumberBR(n.ggr ?? n.ggr_total ?? n.gross_gaming_revenue ?? 0),
+      chargeback: toNumberBR(n.chargeback ?? n.cbk ?? n.charge_back ?? 0),
+      deposit: toNumberBR(n.deposit ?? n.deposito ?? n.deposits ?? n.valor_deposito ?? 0),
+      withdrawal: toNumberBR(n.withdrawal ?? n.saque ?? n.saques ?? n.withdraw ?? 0),
+    } as Transaction;
+  }).filter((t) => t.customer_id && !isNaN(new Date(t.date as any).getTime()));
+  return mapped;
 }
 
 export async function parsePaymentsFile(file: File): Promise<Payment[]> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
   const ws = wb.Sheets["pagamentos_cpa_rev"] ?? wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<any>(ws, { defval: null });
-  return rows.map((r) => ({
-    clientes_id: r.clientes_id ? String(r.clientes_id) : null,
-    afiliados_id: String(r.afiliados_id ?? r.afiliado_id ?? r["afiliados_id"]).trim(),
-    date: parseDate(r.date ?? r.data),
-    value: Number(r.value ?? r.valor ?? 0),
-    method: String(r.method ?? r.tipo ?? "").toLowerCase() as any,
-    status: String(r.status ?? "").toLowerCase() as any,
-    classification: String(r.classification ?? r.classificacao ?? "Jogador"),
-    level: Number(r.level ?? r.nivel ?? 1),
-  }));
+  const rows = XLSX.utils.sheet_to_json<any>(ws, { defval: null, raw: true });
+  return rows.map((r) => {
+    const n = normalizeRow(r);
+    return {
+      clientes_id: n.clientes_id ? String(n.clientes_id) : null,
+      afiliados_id: String(n.afiliados_id ?? n.afiliado_id ?? n.afiliado ?? n["afiliados_id"]).trim(),
+      date: parseDate(n.date ?? n.data ?? n.dt ?? null),
+      value: toNumberBR(n.value ?? n.valor ?? 0),
+      method: String(n.method ?? n.tipo ?? "").toLowerCase() as any,
+      status: String(n.status ?? "").toLowerCase() as any,
+      classification: String(n.classification ?? n.classificacao ?? "Jogador"),
+      level: Number(n.level ?? n.nivel ?? 1),
+    } as Payment;
+  });
 }
 
 export const getCohortWeek = (d: Date) => startOfWeek(d, { weekStartsOn: 1 });
