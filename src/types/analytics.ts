@@ -47,3 +47,35 @@ export interface AffiliateSummary {
   score: number; // 0-100
   rejectedRate: number; // 0-1
 }
+
+// Extended Cohort summary for day/week/month with payments and profitability details
+export type CohortGranularity = "day" | "week" | "month";
+
+export interface CohortSummaryV2 {
+  granularity: CohortGranularity;
+  periodStart: Date; // start of day/week/month in America/Sao_Paulo
+  customers: number;
+  deposits: number;
+  withdrawals: number;
+  ggr: number;
+  chargeback: number;
+  ngr_total: number; // (ggr - chargeback) * 0.8
+  cpa_pago: number; // payments method=cpa, status=finish in [anchor, today]
+  rev_pago: number; // payments method=rev, status=finish in [anchor, today]
+  pago_total: number; // cpa_pago + rev_pago
+  ltv_total: number; // = ngr_total
+  lucro: number; // ngr_total - pago_total
+  roi: number | null; // null => display "—"
+  tempo: number; // elapsed units since periodStart (days/weeks/months)
+  breakeven_periods?: number | null; // first period index where cumulative NGR >= cumulative Paid
+}
+
+export interface AffiliatePaidSummary {
+  afiliados_id: string;
+  customers: number;
+  ngr_total: number;
+  cpa_pago: number;
+  rev_pago: number;
+  total_recebido: number;
+  roi: number | null;
+}
