@@ -9,6 +9,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import Cohorts from "@/pages/Cohorts";
 import Affiliates from "@/pages/Affiliates";
 import Fraud from "@/pages/Fraud";
+import Database from "@/pages/Database";
 import { AnalyticsProvider } from "@/context/AnalyticsContext";
 import { AuthProvider } from "@/context/AuthContext";
 import RequireAuth from "@/components/RequireAuth";
@@ -31,6 +32,7 @@ const App = () => (
                   <Route path="/cohorts" element={<Cohorts />} />
                   <Route path="/afiliados" element={<Affiliates />} />
                   <Route path="/fraudes" element={<Fraud />} />
+                  <Route path="/database" element={<Database />} />
                 </Route>
               </Route>
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

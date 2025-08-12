@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 
 const navItems = [
   { to: "/", label: "Dashboard" },
+  { to: "/database", label: "Banco de Dados" },
   { to: "/cohorts", label: "Cohorts" },
   { to: "/afiliados", label: "Afiliados" },
   { to: "/fraudes", label: "Fraudes" },

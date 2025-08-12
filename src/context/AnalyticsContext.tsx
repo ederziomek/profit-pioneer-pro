@@ -35,6 +35,42 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return computeAll(dataset);
   }, [dataset]);
 
+  const refresh = React.useCallback(async () => {
+    const [txRes, pyRes] = await Promise.all([
+      supabase.from('transactions').select('*').order('date', { ascending: true }),
+      supabase.from('payments').select('*').order('date', { ascending: true }),
+    ]);
+
+    if (txRes.error) console.error('Erro ao carregar transações:', txRes.error);
+    if (pyRes.error) console.error('Erro ao carregar pagamentos:', pyRes.error);
+
+    if (txRes.data) {
+      setTransactions(
+        txRes.data.map((t: any) => ({
+          customer_id: t.customer_id,
+          date: new Date(t.date),
+          ggr: Number(t.ggr),
+          chargeback: Number(t.chargeback),
+          deposit: Number(t.deposit),
+          withdrawal: Number(t.withdrawal),
+        }))
+      );
+    }
+    if (pyRes.data) {
+      setPayments(
+        pyRes.data.map((p: any) => ({
+          clientes_id: p.clientes_id,
+          afiliados_id: p.afiliados_id,
+          date: new Date(p.date),
+          value: Number(p.value),
+          method: p.method,
+          status: p.status,
+          classification: p.classification,
+          level: Number(p.level),
+        }))
+      );
+    }
+  }, []);
   const importTransactions = async (file: File) => {
     const rows = await parseTransactionsFile(file);
     const payload = rows.map((r) => ({
@@ -46,21 +82,18 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       withdrawal: r.withdrawal,
     }));
 
-    const { error: delErr } = await supabase
+    const { error } = await supabase
       .from('transactions')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000');
-    if (delErr) console.error('Erro ao limpar transações:', delErr);
+      .upsert(payload, { onConflict: 'natural_key', ignoreDuplicates: true });
 
-    const { error } = await supabase.from('transactions').insert(payload);
     if (error) {
       toast({ title: 'Erro ao salvar Transações', description: error.message });
       return;
     }
-    setTransactions(rows);
-    toast({ title: 'Transações importadas', description: `${rows.length} linhas salvas no banco.` });
-  };
 
+    await refresh();
+    toast({ title: 'Transações importadas', description: `${rows.length} linhas processadas (sem duplicar).` });
+  };
   const importPayments = async (file: File) => {
     const rows = await parsePaymentsFile(file);
     const payload = rows.map((r) => ({
@@ -74,60 +107,22 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       level: r.level,
     }));
 
-    const { error: delErr } = await supabase
+    const { error } = await supabase
       .from('payments')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000');
-    if (delErr) console.error('Erro ao limpar pagamentos:', delErr);
+      .upsert(payload, { onConflict: 'natural_key', ignoreDuplicates: true });
 
-    const { error } = await supabase.from('payments').insert(payload);
     if (error) {
       toast({ title: 'Erro ao salvar Pagamentos', description: error.message });
       return;
     }
-    setPayments(rows);
-    toast({ title: 'Pagamentos importados', description: `${rows.length} linhas salvas no banco.` });
+
+    await refresh();
+    toast({ title: 'Pagamentos importados', description: `${rows.length} linhas processadas (sem duplicar).` });
   };
   React.useEffect(() => {
     // Carrega dados do Supabase ao iniciar
-    const load = async () => {
-      const [txRes, pyRes] = await Promise.all([
-        supabase.from('transactions').select('*').order('date', { ascending: true }),
-        supabase.from('payments').select('*').order('date', { ascending: true }),
-      ]);
-
-      if (txRes.error) console.error('Erro ao carregar transações:', txRes.error);
-      if (pyRes.error) console.error('Erro ao carregar pagamentos:', pyRes.error);
-
-      if (txRes.data) {
-        setTransactions(
-          txRes.data.map((t: any) => ({
-            customer_id: t.customer_id,
-            date: new Date(t.date),
-            ggr: Number(t.ggr),
-            chargeback: Number(t.chargeback),
-            deposit: Number(t.deposit),
-            withdrawal: Number(t.withdrawal),
-          }))
-        );
-      }
-      if (pyRes.data) {
-        setPayments(
-          pyRes.data.map((p: any) => ({
-            clientes_id: p.clientes_id,
-            afiliados_id: p.afiliados_id,
-            date: new Date(p.date),
-            value: Number(p.value),
-            method: p.method,
-            status: p.status,
-            classification: p.classification,
-            level: Number(p.level),
-          }))
-        );
-      }
-    };
-    load();
-  }, []);
+    refresh();
+  }, [refresh]);
   const reset = () => {
     void (async () => {
       setTransactions(null);

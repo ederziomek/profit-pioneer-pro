@@ -1,12 +1,12 @@
 import SEO from "@/components/SEO";
-import DataUploader from "@/components/import/DataUploader";
+
 import { useAnalytics } from "@/context/AnalyticsContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
 import { format } from "date-fns";
 import { computeCohortsV2 } from "@/lib/analytics";
 const Index = () => {
-const { totals, cohorts, affiliates, importPayments, importTransactions, dataset } = useAnalytics();
+const { totals, cohorts, affiliates, dataset } = useAnalytics();
 
 const rows = dataset ? computeCohortsV2(dataset, "week") : [];
 const chartData = rows.map((r) => ({
@@ -19,12 +19,11 @@ const chartData = rows.map((r) => ({
       <SEO title="Dashboard — IG Afiliados Analytics" description="Resumo de ROI, cohorts e carregamento de planilhas." canonical="/" />
 
       <section className="rounded-xl p-8 bg-hero-gradient text-primary-foreground shadow-glow hover:tilt">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="flex items-start">
           <div>
             <h1 className="text-3xl font-semibold text-muted-foreground">Dashboard — IG Afiliados Analytics</h1>
-            <p className="opacity-90">Carregue as planilhas de Transações e Pagamentos para iniciar as análises.</p>
+            <p className="opacity-90">Visão geral do desempenho e ROI.</p>
           </div>
-          <DataUploader onTransactions={importTransactions} onPayments={importPayments} />
         </div>
       </section>
 
