@@ -24,6 +24,7 @@ export type Database = {
           id: string
           level: number
           method: string
+          natural_key: string | null
           status: string
           value: number
         }
@@ -36,6 +37,7 @@ export type Database = {
           id?: string
           level: number
           method: string
+          natural_key?: string | null
           status: string
           value: number
         }
@@ -48,6 +50,7 @@ export type Database = {
           id?: string
           level?: number
           method?: string
+          natural_key?: string | null
           status?: string
           value?: number
         }
@@ -83,6 +86,7 @@ export type Database = {
           deposit: number
           ggr: number
           id: string
+          natural_key: string | null
           withdrawal: number
         }
         Insert: {
@@ -93,6 +97,7 @@ export type Database = {
           deposit: number
           ggr: number
           id?: string
+          natural_key?: string | null
           withdrawal: number
         }
         Update: {
@@ -103,6 +108,7 @@ export type Database = {
           deposit?: number
           ggr?: number
           id?: string
+          natural_key?: string | null
           withdrawal?: number
         }
         Relationships: []
