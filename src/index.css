@@ -45,6 +45,12 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 258 85% 54%;
 
+    /* Topbar */
+    --topbar-background: 198 17% 13%;
+    --topbar-foreground: 180 15% 95%;
+    --topbar-accent: 181 60% 40%;
+    --topbar-border: 181 40% 32%;
+
     /* Extended tokens */
     --brand: 258 85% 54%;
     --brand-2: 280 85% 60%;
@@ -96,6 +102,12 @@
     --sidebar-accent-foreground: 240 5% 96%;
     --sidebar-border: 240 4% 16%;
     --sidebar-ring: 258 85% 62%;
+
+    /* Topbar */
+    --topbar-background: 198 18% 12%;
+    --topbar-foreground: 180 15% 96%;
+    --topbar-accent: 181 62% 42%;
+    --topbar-border: 181 42% 33%;
 
     --brand: 258 85% 62%;
     --brand-2: 280 85% 64%;
