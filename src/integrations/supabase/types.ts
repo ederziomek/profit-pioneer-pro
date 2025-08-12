@@ -14,7 +14,78 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      payments: {
+        Row: {
+          afiliados_id: string
+          classification: string
+          clientes_id: string | null
+          created_at: string
+          date: string
+          id: string
+          level: number
+          method: string
+          status: string
+          value: number
+        }
+        Insert: {
+          afiliados_id: string
+          classification: string
+          clientes_id?: string | null
+          created_at?: string
+          date: string
+          id?: string
+          level: number
+          method: string
+          status: string
+          value: number
+        }
+        Update: {
+          afiliados_id?: string
+          classification?: string
+          clientes_id?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          level?: number
+          method?: string
+          status?: string
+          value?: number
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          chargeback: number
+          created_at: string
+          customer_id: string
+          date: string
+          deposit: number
+          ggr: number
+          id: string
+          withdrawal: number
+        }
+        Insert: {
+          chargeback: number
+          created_at?: string
+          customer_id: string
+          date: string
+          deposit: number
+          ggr: number
+          id?: string
+          withdrawal: number
+        }
+        Update: {
+          chargeback?: number
+          created_at?: string
+          customer_id?: string
+          date?: string
+          deposit?: number
+          ggr?: number
+          id?: string
+          withdrawal?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
