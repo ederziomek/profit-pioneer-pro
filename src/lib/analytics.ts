@@ -63,7 +63,7 @@ export async function parseTransactionsFile(file: File): Promise<Transaction[]> 
       ggr: toNumberBR(n.ggr ?? n.ggr_total ?? n.gross_gaming_revenue ?? 0),
       chargeback: toNumberBR(n.chargeback ?? n.cbk ?? n.charge_back ?? 0),
       deposit: toNumberBR(n.deposit ?? n.deposito ?? n.deposits ?? n.valor_deposito ?? 0),
-      withdrawal: toNumberBR(n.withdrawal ?? n.saque ?? n.saques ?? n.withdraw ?? 0),
+      withdrawal: toNumberBR(n.withdrawal ?? n.withdrawals ?? n.saque ?? n.saques ?? n.valor_saque ?? n.saque_total ?? n.saques_total ?? n.retirada ?? n.retiradas ?? n.cashout ?? n.cash_out ?? n.withdraw ?? 0),
     } as Transaction;
   }).filter((t) => t.customer_id && !isNaN(new Date(t.date as any).getTime()));
   return mapped;
