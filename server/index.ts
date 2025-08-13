@@ -26,16 +26,40 @@ if (!isProduction) {
 }
 
 // Rota de healthcheck para o Railway
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
   try {
-    res.status(200).json({ 
-      status: 'ok', 
+    let databaseStatus = 'unknown';
+    let databaseError = null;
+    
+    try {
+      const client = await getNeonClient();
+      await client.query('SELECT 1');
+      databaseStatus = 'connected';
+    } catch (error) {
+      databaseStatus = 'error';
+      databaseError = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('❌ Erro na verificação do banco:', error);
+    }
+    
+    const healthData = {
+      status: databaseStatus === 'connected' ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       port: port,
-      message: 'Server is running and healthy'
-    });
+      database: {
+        status: databaseStatus,
+        error: databaseError,
+        url: DATABASE_URL ? 'configured' : 'missing'
+      },
+      message: databaseStatus === 'connected' 
+        ? 'Server is running and healthy' 
+        : 'Server is running but database is unavailable'
+    };
+    
+    const statusCode = databaseStatus === 'connected' ? 200 : 503;
+    res.status(statusCode).json(healthData);
+    
   } catch (error) {
     console.error('Erro no healthcheck:', error);
     res.status(500).json({ 
@@ -54,19 +78,84 @@ app.get('/health/simple', (req, res) => {
 // Configuração do multer para upload de arquivos
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Configuração do banco Neon
-const NEON_DATABASE_URL = process.env.NEON_DATABASE_URL || 
-  "postgresql://neondb_owner:npg_SjN6yxOIKnc1@ep-green-surf-adprt5l3-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+// Configuração do banco - priorizar DATABASE_URL do Railway
+const DATABASE_URL = process.env.DATABASE_URL || 
+  process.env.NEON_DATABASE_URL || 
+  "postgresql://neondb_owner:npg_SjN6yxOIKnc1@ep-green-surf-adprt5l3-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require";
+
+console.log('🔗 Configuração do banco:', {
+  hasDatabase: !!DATABASE_URL,
+  environment: process.env.NODE_ENV || 'development',
+  databaseSource: process.env.DATABASE_URL ? 'Railway' : 'Neon'
+});
 
 // Cliente do banco
 let neonClient: Client | null = null;
 
 const getNeonClient = async () => {
   if (!neonClient) {
-    neonClient = new Client({ connectionString: NEON_DATABASE_URL });
-    await neonClient.connect();
+    try {
+      neonClient = new Client({ 
+        connectionString: DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+      });
+      await neonClient.connect();
+      console.log('✅ Conectado ao banco de dados com sucesso');
+      
+      // Criar tabelas se não existirem
+      await createTablesIfNotExist();
+      
+    } catch (error) {
+      console.error('❌ Erro ao conectar ao banco:', error);
+      neonClient = null;
+      throw error;
+    }
   }
   return neonClient;
+};
+
+// Função para criar tabelas se não existirem
+const createTablesIfNotExist = async () => {
+  if (!neonClient) return;
+  
+  try {
+    // Criar tabela de transações
+    await neonClient.query(`
+      CREATE TABLE IF NOT EXISTS transactions (
+        id SERIAL PRIMARY KEY,
+        natural_key VARCHAR(255) UNIQUE NOT NULL,
+        customer_id VARCHAR(255) NOT NULL,
+        date TIMESTAMP NOT NULL,
+        ggr DECIMAL(10,2) DEFAULT 0,
+        chargeback DECIMAL(10,2) DEFAULT 0,
+        deposit DECIMAL(10,2) DEFAULT 0,
+        withdrawal DECIMAL(10,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Criar tabela de pagamentos
+    await neonClient.query(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id SERIAL PRIMARY KEY,
+        natural_key VARCHAR(255) UNIQUE NOT NULL,
+        clientes_id VARCHAR(255),
+        afiliados_id VARCHAR(255) NOT NULL,
+        date TIMESTAMP NOT NULL,
+        value DECIMAL(10,2) DEFAULT 0,
+        method VARCHAR(50) DEFAULT 'cpa',
+        status VARCHAR(50) DEFAULT 'finish',
+        classification VARCHAR(50) DEFAULT 'normal',
+        level INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    console.log('✅ Tabelas verificadas/criadas com sucesso');
+    
+  } catch (error) {
+    console.error('❌ Erro ao criar tabelas:', error);
+  }
 };
 
 // Função para processar arquivo de transações
