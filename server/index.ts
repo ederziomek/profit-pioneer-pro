@@ -11,10 +11,59 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = process.env.PORT || 3000;
+const isProduction = process.env.NODE_ENV === 'production';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Log de requests em desenvolvimento
+if (!isProduction) {
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+  });
+}
+
+// Rota de healthcheck para o Railway
+app.get('/health', async (req, res) => {
+  try {
+    // Verificar conexão com o banco
+    let dbStatus = 'disconnected';
+    try {
+      const client = await getNeonClient();
+      await client.query('SELECT 1');
+      dbStatus = 'connected';
+    } catch (dbError) {
+      console.error('Erro na conexão com banco:', dbError);
+      dbStatus = 'error';
+    }
+
+    res.status(200).json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: dbStatus,
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    console.error('Erro no healthcheck:', error);
+    res.status(500).json({ 
+      status: 'error', 
+      error: error instanceof Error ? error.message : 'Erro desconhecido',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Rota raiz simples para compatibilidade
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    message: 'Profit Pioneer Pro API',
+    status: 'running',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Configuração do multer para upload de arquivos
 const upload = multer({ storage: multer.memoryStorage() });
@@ -328,17 +377,52 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
+// Middleware de tratamento de erros global
+app.use((error: any, req: any, res: any, next: any) => {
+  console.error('Erro não tratado:', error);
+  res.status(500).json({
+    error: 'Erro interno do servidor',
+    message: error instanceof Error ? error.message : 'Erro desconhecido',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Iniciar servidor
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Servidor unificado rodando na porta ${port}`);
   console.log(`Frontend: http://localhost:${port}`);
   console.log(`API: http://localhost:${port}/api`);
+  console.log(`Healthcheck: http://localhost:${port}/health`);
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  if (neonClient) {
-    await neonClient.end();
+  console.log('Recebido SIGINT, iniciando graceful shutdown...');
+  
+  try {
+    if (neonClient) {
+      console.log('Fechando conexão com banco...');
+      await neonClient.end();
+    }
+    
+    server.close(() => {
+      console.log('Servidor HTTP fechado');
+      process.exit(0);
+    });
+    
+    // Timeout para forçar saída se necessário
+    setTimeout(() => {
+      console.error('Forçando saída após timeout');
+      process.exit(1);
+    }, 10000);
+    
+  } catch (error) {
+    console.error('Erro durante shutdown:', error);
+    process.exit(1);
   }
-  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('Recebido SIGTERM, iniciando graceful shutdown...');
+  process.emit('SIGINT');
 });
