@@ -160,10 +160,10 @@ const createTablesIfNotExist = async () => {
 
 // Função para processar arquivo de transações
 const parseTransactionsFile = (buffer: Buffer) => {
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+  const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
   
   if (data.length === 0) return [];
   
@@ -215,7 +215,7 @@ const parseTransactionsFile = (buffer: Buffer) => {
     
     return {
       customer_id: String(row[customerIdIndex]),
-      date: new Date(row[dateIndex]),
+      date: new Date(row[dateIndex] instanceof Date ? row[dateIndex] : new Date(row[dateIndex])),
       ggr: Number(row[ggrIndex]) || 0,
       chargeback: Number(row[chargebackIndex]) || 0,
       deposit: Number(row[depositIndex]) || 0,
@@ -229,10 +229,10 @@ const parseTransactionsFile = (buffer: Buffer) => {
 
 // Função para processar arquivo de pagamentos
 const parsePaymentsFile = (buffer: Buffer) => {
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+  const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
   
   if (data.length === 0) return [];
   
@@ -289,7 +289,7 @@ const parsePaymentsFile = (buffer: Buffer) => {
     return {
       clientes_id: row[clientesIdIndex] ? String(row[clientesIdIndex]) : null,
       afiliados_id: String(row[afiliadosIdIndex]),
-      date: new Date(row[dateIndex]),
+      date: new Date(row[dateIndex] instanceof Date ? row[dateIndex] : new Date(row[dateIndex])),
       value: Number(row[valueIndex]) || 0,
       method: String(row[methodIndex]) || 'cpa',
       status: String(row[statusIndex]) || 'finish',

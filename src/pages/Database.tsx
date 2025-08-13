@@ -20,40 +20,37 @@ const Database: React.FC = () => {
   const fetchMeta = React.useCallback(async () => {
     setLoading(true);
     try {
-      const client = await getNeonClient();
-      
-      // Contar transações e pagamentos
-      const [txHead, pyHead] = await Promise.all([
-        client.query('SELECT COUNT(*) as count FROM transactions'),
-        client.query('SELECT COUNT(*) as count FROM payments'),
+      // Usar APIs do backend em vez do cliente Neon diretamente
+      const [countsResponse, weeksResponse] = await Promise.all([
+        fetch('/api/counts'),
+        fetch('/api/weeks'),
       ]);
       
-      setTxCount(parseInt(txHead.rows[0].count));
-      setPyCount(parseInt(pyHead.rows[0].count));
+      if (!countsResponse.ok || !weeksResponse.ok) {
+        throw new Error('Erro ao buscar dados do servidor');
+      }
+      
+      const counts = await countsResponse.json();
+      const weeks = await weeksResponse.json();
+      
+      setTxCount(counts.transactions || 0);
+      setPyCount(counts.payments || 0);
 
-      // Buscar semanas com dados
-      const [txWeeksRes, pyWeeksRes] = await Promise.all([
-        client.query(`
-          SELECT DISTINCT (date_trunc('week', date AT TIME ZONE 'America/Sao_Paulo'))::date AS week_start
-          FROM transactions
-          ORDER BY week_start
-        `),
-        client.query(`
-          SELECT DISTINCT (date_trunc('week', date AT TIME ZONE 'America/Sao_Paulo'))::date AS week_start
-          FROM payments
-          ORDER BY week_start
-        `),
-      ]);
-
-      const mapWeeks = (rows: any[]) => {
-        if (!rows || rows.length === 0) return [] as string[];
-        return rows.map((r) => format(new Date(r.week_start), 'dd/MM'));
+      // Formatar semanas para exibição
+      const formatWeeks = (weekDates: string[]) => {
+        if (!weekDates || weekDates.length === 0) return [] as string[];
+        return weekDates.map((dateStr) => format(new Date(dateStr), 'dd/MM'));
       };
 
-      setTxWeeks(mapWeeks(txWeeksRes.rows));
-      setPyWeeks(mapWeeks(pyWeeksRes.rows));
+      setTxWeeks(formatWeeks(weeks.transactions || []));
+      setPyWeeks(formatWeeks(weeks.payments || []));
     } catch (error) {
       console.error('Erro ao buscar metadados:', error);
+      // Mostrar mensagem de erro para o usuário
+      setTxCount(0);
+      setPyCount(0);
+      setTxWeeks([]);
+      setPyWeeks([]);
     } finally {
       setLoading(false);
     }

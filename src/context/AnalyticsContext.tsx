@@ -312,31 +312,37 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       try {
         console.log('Iniciando limpeza do banco de dados...');
         
-        const client = await getNeonClient();
+        // Usar API do backend em vez do cliente frontend
+        const response = await fetch('/api/reset', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
         
-        const txResult = await client.query('DELETE FROM transactions');
-        console.log(`Transacoes removidas: ${txResult.rowCount}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
         
-        const pyResult = await client.query('DELETE FROM payments');
-        console.log(`Pagamentos removidos: ${pyResult.rowCount}`);
-        
-        console.log(`Limpeza concluida: ${txResult.rowCount} transacoes e ${pyResult.rowCount} pagamentos removidos`);
+        const result = await response.json();
+        console.log('Resultado da limpeza:', result);
         
         await refresh();
         toast({ 
           title: 'Dados limpos com sucesso!', 
-          description: `Banco de dados zerado. ${txResult.rowCount} transacoes e ${pyResult.rowCount} pagamentos removidos.` 
+          description: `${result.transactionsDeleted} transações e ${result.paymentsDeleted} pagamentos removidos.` 
         });
       } catch (error) {
         console.error('Erro ao limpar dados:', error);
         toast({ 
           title: 'Erro ao limpar dados', 
-          description: error instanceof Error ? error.message : 'Erro desconhecido ao conectar com o banco Neon.' 
+          description: error instanceof Error ? error.message : 'Erro desconhecido',
+          variant: 'destructive'
         });
       }
     })();
   };
-
   React.useEffect(() => {
     refresh();
   }, [refresh]);
