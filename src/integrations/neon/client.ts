@@ -62,8 +62,8 @@ export const fetchPaginatedData = async <T>(
   table: string, 
   page: number, 
   pageSize: number, 
-  orderBy: string = 'date',
-  orderDirection: OrderDirection = 'DESC'
+  orderBy: string,
+  orderDirection: OrderDirection
 ): Promise<{ data: T[]; total: number }> {
   const client = await getNeonClient();
   try {
