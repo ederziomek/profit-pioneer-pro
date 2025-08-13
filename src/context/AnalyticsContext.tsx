@@ -134,6 +134,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (txDel.error || pyDel.error) {
         toast({ title: 'Erro ao limpar dados', description: (txDel.error || pyDel.error)?.message ?? 'Verifique as políticas RLS.' });
       } else {
+        await refresh();
         toast({ title: 'Dados limpos', description: 'As tabelas foram esvaziadas.' });
       }
     })();
