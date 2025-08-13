@@ -1,5 +1,8 @@
 import { Client } from 'pg';
 
+// Tipos para direção de ordenação
+type OrderDirection = 'ASC' | 'DESC';
+
 // Configuração do Neon
 const NEON_DATABASE_URL = process.env.NEON_DATABASE_URL || 
   "postgresql://neondb_owner:npg_SjN6yxOIKnc1@ep-green-surf-adprt5l3-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
@@ -60,7 +63,7 @@ export const fetchPaginatedData = async <T>(
   page: number, 
   pageSize: number, 
   orderBy: string = 'date',
-  orderDirection: 'ASC' | 'DESC' = 'DESC'
+  orderDirection: OrderDirection = 'DESC'
 ): Promise<{ data: T[]; total: number }> {
   const client = await getNeonClient();
   try {
