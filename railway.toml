@@ -2,8 +2,8 @@
 builder = "nixpacks"
 
 [deploy]
-# Servidor Express CORRIGIDO - healthcheck sempre responde, mesmo sem banco
-startCommand = "npm run build && node server/express-corrected.js"
+# Servidor Express CORRIGIDO FINAL - importação de planilhas funcionando
+startCommand = "npm run build && node server/express-fixed.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 60
 restartPolicyType = "on_failure"
