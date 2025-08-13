@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import React from "react";
 import { computeCohortsV2 } from "@/lib/analytics";
-import type { CohortGranularity } from "@/types/analytics";
+import type { CohortGranularity, CohortSummaryV2 } from "@/types/analytics";
+import { useSorting } from "@/hooks/useSorting";
+import { SortableHeader } from "@/components/ui/sortable-header";
 
 const Cohorts = () => {
   const { dataset } = useAnalytics();
@@ -16,7 +18,17 @@ const Cohorts = () => {
     return computeCohortsV2(dataset, granularity);
   }, [dataset, granularity]);
 
+  // Configurar ordenação padrão por período (mais recente primeiro)
+  const { sortedData, sortConfig, requestSort } = useSorting<CohortSummaryV2>(rows, {
+    key: 'periodStart',
+    direction: 'desc'
+  });
+
   const formatMoney = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  const handleSort = (key: keyof CohortSummaryV2) => {
+    requestSort(key);
+  };
 
   return (
     <div className="space-y-6">
@@ -35,25 +47,136 @@ const Cohorts = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2">Período</th>
-                  <th className="text-right">Tempo</th>
-                  <th className="text-right">Clientes</th>
-                  <th className="text-right">Depósitos</th>
-                  <th className="text-right">Saques</th>
-                  <th className="text-right">GGR</th>
-                  <th className="text-right">Chargeback</th>
-                  <th className="text-right">NGR</th>
-                  <th className="text-right">CPA Pago</th>
-                  <th className="text-right">REV Pago</th>
-                  <th className="text-right">Pago Total</th>
-                  <th className="text-right">LTV</th>
-                  <th className="text-right">Lucro</th>
-                  <th className="text-right">ROI</th>
+                  <SortableHeader
+                    sortKey="periodStart"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                  >
+                    Período
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="tempo"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Tempo
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="customers"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Clientes
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="deposits"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Depósitos
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="withdrawals"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Saques
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="ggr"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    GGR
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="chargeback"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Chargeback
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="ngr_total"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    NGR
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="cpa_pago"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    CPA Pago
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="rev_pago"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    REV Pago
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="pago_total"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Pago Total
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="ltv_total"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    LTV
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="lucro"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Lucro
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="roi"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    ROI
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
-                  <tr key={`${r.granularity}-${r.periodStart.toString()}`} className="border-b last:border-0">
+                {sortedData.map((r) => (
+                  <tr key={`${r.granularity}-${r.periodStart.toString()}`} className="border-b last:border-0 hover:bg-muted/50">
                     <td className="py-2">{format(r.periodStart, "dd/MM/yyyy")}</td>
                     <td className="text-right">{r.tempo}</td>
                     <td className="text-right">{r.customers}</td>

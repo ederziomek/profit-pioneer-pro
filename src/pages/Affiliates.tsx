@@ -4,6 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import React from "react";
 import { computeAffiliatesPaid } from "@/lib/analytics";
+import { useSorting } from "@/hooks/useSorting";
+import { usePagination } from "@/hooks/usePagination";
+import { SortableHeader } from "@/components/ui/sortable-header";
+import { Pagination } from "@/components/ui/pagination";
+import type { AffiliatePaidSummary } from "@/types/analytics";
 
 const Affiliates = () => {
   const { dataset } = useAnalytics();
@@ -20,7 +25,29 @@ const Affiliates = () => {
     return computeAffiliatesPaid(dataset, dateRange);
   }, [dataset, dateRange]);
 
+  // Configurar ordenação padrão por NGR (maior para menor)
+  const { sortedData, sortConfig, requestSort } = useSorting<AffiliatePaidSummary>(rows, {
+    key: 'ngr_total',
+    direction: 'desc'
+  });
+
+  // Configurar paginação com 20 itens por padrão
+  const {
+    paginatedData,
+    pagination,
+    totalPages,
+    goToPage,
+    changePageSize,
+    startIndex,
+    endIndex,
+    totalItems,
+  } = usePagination(sortedData, 20);
+
   const formatMoney = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  const handleSort = (key: keyof AffiliatePaidSummary) => {
+    requestSort(key);
+  };
 
   return (
     <div className="space-y-6">
@@ -47,18 +74,73 @@ const Affiliates = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2">Afiliado</th>
-                  <th className="text-right">Clientes</th>
-                  <th className="text-right">NGR</th>
-                  <th className="text-right">CPA Pago</th>
-                  <th className="text-right">REV Pago</th>
-                  <th className="text-right">Total Recebido</th>
-                  <th className="text-right">ROI</th>
+                  <SortableHeader
+                    sortKey="afiliados_id"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                  >
+                    Afiliado
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="customers"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Clientes
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="ngr_total"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    NGR
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="cpa_pago"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    CPA Pago
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="rev_pago"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    REV Pago
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="total_recebido"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Total Recebido
+                  </SortableHeader>
+                  <SortableHeader
+                    sortKey="roi"
+                    currentSortKey={sortConfig?.key}
+                    currentDirection={sortConfig?.direction}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    ROI
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((a) => (
-                  <tr key={a.afiliados_id} className="border-b last:border-0">
+                {paginatedData.map((a) => (
+                  <tr key={a.afiliados_id} className="border-b last:border-0 hover:bg-muted/50">
                     <td className="py-2">#{a.afiliados_id}</td>
                     <td className="text-right">{a.customers}</td>
                     <td className="text-right">{formatMoney(a.ngr_total)}</td>
@@ -71,6 +153,19 @@ const Affiliates = () => {
               </tbody>
             </table>
           </div>
+          
+          {/* Componente de Paginação */}
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalPages={totalPages}
+            pageSize={pagination.pageSize}
+            totalItems={totalItems}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPageChange={goToPage}
+            onPageSizeChange={changePageSize}
+            pageSizeOptions={[20, 100]}
+          />
         </CardContent>
       </Card>
     </div>
