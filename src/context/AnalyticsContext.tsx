@@ -228,132 +228,80 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   const importTransactions = async (file: File) => {
-    const rows = await parseTransactionsFile(file);
-    const payload = rows.map((r) => ({
-      natural_key: `${r.customer_id}|${format(r.date, 'yyyy-MM-dd')}`,
-      customer_id: r.customer_id,
-      date: r.date.toISOString(),
-      ggr: r.ggr,
-      chargeback: r.chargeback,
-      deposit: r.deposit,
-      withdrawal: r.withdrawal,
-    }));
-
-    if (rows.length > 0) {
-      const minDate = new Date(Math.min(...rows.map(r => r.date.getTime())));
-      const maxDate = new Date(Math.max(...rows.map(r => r.date.getTime())));
-      toast({ title: 'Prévia de Transações', description: `${rows.length} linhas (${format(minDate,'dd/MM/yyyy')} a ${format(maxDate,'dd/MM/yyyy')})` });
-    } else {
-      toast({ title: 'Nenhuma transação encontrada', description: 'Verifique a planilha (abas e colunas).' });
-    }
-
-    const byKey = new Map<string, typeof payload[number]>();
-    for (const p of payload) if (!byKey.has(p.natural_key)) byKey.set(p.natural_key, p);
-    const records = Array.from(byKey.values());
-
     try {
-      const client = await getNeonClient();
-      const CHUNK = 1000;
-      for (let i = 0; i < records.length; i += CHUNK) {
-        const chunk = records.slice(i, i + CHUNK);
-        
-        const values = chunk.map((_, index) => {
-          const baseIndex = index * 6;
-          return `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6})`;
-        }).join(', ');
-        
-        const params = chunk.flatMap(record => [
-          record.natural_key, record.customer_id, record.date, 
-          record.ggr, record.chargeback, record.deposit, record.withdrawal
-        ]);
-        
-        const query = `
-          INSERT INTO transactions (natural_key, customer_id, date, ggr, chargeback, deposit, withdrawal)
-          VALUES ${values}
-          ON CONFLICT (natural_key) DO UPDATE SET
-            customer_id = EXCLUDED.customer_id,
-            date = EXCLUDED.date,
-            ggr = EXCLUDED.ggr,
-            chargeback = EXCLUDED.chargeback,
-            deposit = EXCLUDED.deposit,
-            withdrawal = EXCLUDED.withdrawal
-        `;
-        
-        await client.query(query, params);
+      console.log('📁 Iniciando importação de transações:', file.name, file.size);
+      
+      // Criar FormData para enviar o arquivo
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Fazer upload para a API
+      const response = await fetch('/api/import/transactions', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
       
+      const result = await response.json();
+      console.log('✅ Resultado da importação:', result);
+      
+      // Atualizar contadores e dados
       await refresh();
-      toast({ title: 'Transações importadas', description: `${records.length.toLocaleString()} linhas processadas (deduplicadas) no Neon.` });
+      
+      toast({ 
+        title: 'Transações importadas com sucesso!', 
+        description: `${result.total} transações processadas (${result.inserted} inseridas, ${result.updated} atualizadas)` 
+      });
+      
     } catch (error) {
-      console.error('Erro ao importar transações para Neon:', error);
-      toast({ title: 'Erro ao salvar Transações', description: 'Erro ao conectar com o banco Neon.' });
+      console.error('❌ Erro ao importar transações:', error);
+      toast({ 
+        title: 'Erro ao importar transações', 
+        description: error instanceof Error ? error.message : 'Erro desconhecido' 
+      });
     }
   };
 
   const importPayments = async (file: File) => {
-    const rows = await parsePaymentsFile(file);
-    const payload = rows.map((r) => ({
-      natural_key: `${r.afiliados_id}|${(r.clientes_id ?? 'null')}|${format(r.date, 'yyyy-MM-dd')}|${r.method}|${r.value}`,
-      clientes_id: r.clientes_id,
-      afiliados_id: r.afiliados_id,
-      date: r.date.toISOString(),
-      value: r.value,
-      method: r.method,
-      status: r.status,
-      classification: r.classification,
-      level: r.level,
-    }));
-
-    if (rows.length > 0) {
-      const minDate = new Date(Math.min(...rows.map(r => r.date.getTime())));
-      const maxDate = new Date(Math.max(...rows.map(r => r.date.getTime())));
-      toast({ title: 'Prévia de Pagamentos', description: `${rows.length} linhas (${format(minDate,'dd/MM/yyyy')} a ${format(maxDate,'dd/MM/yyyy')})` });
-    } else {
-      toast({ title: 'Nenhum pagamento encontrado', description: 'Verifique a planilha (abas e colunas: afiliado, data, valor, status, método).' });
-    }
-
-    const byKey = new Map<string, typeof payload[number]>();
-    for (const p of payload) if (!byKey.has(p.natural_key)) byKey.set(p.natural_key, p);
-    const records = Array.from(byKey.values());
-
     try {
-      const client = await getNeonClient();
-      const CHUNK = 1000;
-      for (let i = 0; i < records.length; i += CHUNK) {
-        const chunk = records.slice(i, i + CHUNK);
-        
-        const values = chunk.map((_, index) => {
-          const baseIndex = index * 9;
-          return `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7}, $${baseIndex + 8}, $${baseIndex + 9})`;
-        }).join(', ');
-        
-        const params = chunk.flatMap(record => [
-          record.natural_key, record.clientes_id, record.afiliados_id, record.date,
-          record.value, record.method, record.status, record.classification, record.level
-        ]);
-        
-        const query = `
-          INSERT INTO payments (natural_key, clientes_id, afiliados_id, date, value, method, status, classification, level)
-          VALUES ${values}
-          ON CONFLICT (natural_key) DO UPDATE SET
-            clientes_id = EXCLUDED.clientes_id,
-            afiliados_id = EXCLUDED.afiliados_id,
-            date = EXCLUDED.date,
-            value = EXCLUDED.value,
-            method = EXCLUDED.method,
-            status = EXCLUDED.status,
-            classification = EXCLUDED.classification,
-            level = EXCLUDED.level
-        `;
-        
-        await client.query(query, params);
+      console.log('📁 Iniciando importação de pagamentos:', file.name, file.size);
+      
+      // Criar FormData para enviar o arquivo
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Fazer upload para a API
+      const response = await fetch('/api/import/payments', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
       
+      const result = await response.json();
+      console.log('✅ Resultado da importação:', result);
+      
+      // Atualizar contadores e dados
       await refresh();
-      toast({ title: 'Pagamentos importados', description: `${records.length.toLocaleString()} linhas processadas (deduplicadas) no Neon.` });
+      
+      toast({ 
+        title: 'Pagamentos importados com sucesso!', 
+        description: `${result.total} pagamentos processados (${result.inserted} inseridos, ${result.updated} atualizados)` 
+      });
+      
     } catch (error) {
-      console.error('Erro ao importar pagamentos para Neon:', error);
-      toast({ title: 'Erro ao salvar Pagamentos', description: 'Erro ao conectar com o banco Neon.' });
+      console.error('❌ Erro ao importar pagamentos:', error);
+      toast({ 
+        title: 'Erro ao importar pagamentos', 
+        description: error instanceof Error ? error.message : 'Erro desconhecido' 
+      });
     }
   };
 

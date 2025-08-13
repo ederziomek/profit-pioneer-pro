@@ -2,7 +2,7 @@
 builder = "nixpacks"
 
 [deploy]
-# Servidor Express CORRIGIDO FINAL - importação de planilhas funcionando
+# FORÇAR NOVO DEPLOY - Servidor express-fixed.js para importação funcionando
 startCommand = "npm run build && node server/express-fixed.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 60
