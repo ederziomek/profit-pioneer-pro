@@ -18,6 +18,7 @@ interface AnalyticsContextType {
   importTransactions: (file: File) => Promise<void>;
   importPayments: (file: File) => Promise<void>;
   reset: () => void;
+  refresh: () => Promise<void>;
 }
 
 const AnalyticsContext = createContext<AnalyticsContextType | undefined>(undefined);
@@ -203,7 +204,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     })();
   };
   return (
-    <AnalyticsContext.Provider value={{ dataset, cohorts, affiliates, totals, suspicious, importTransactions, importPayments, reset }}>
+    <AnalyticsContext.Provider value={{ dataset, cohorts, affiliates, totals, suspicious, importTransactions, importPayments, reset, refresh }}>
       {children}
     </AnalyticsContext.Provider>
   );

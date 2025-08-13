@@ -14,7 +14,7 @@ const Database: React.FC = () => {
   const [pyCount, setPyCount] = React.useState<number>(0);
   const [txWeeks, setTxWeeks] = React.useState<string[]>([]);
   const [pyWeeks, setPyWeeks] = React.useState<string[]>([]);
-  const { importTransactions, importPayments, reset } = useAnalytics();
+  const { importTransactions, importPayments, reset, refresh } = useAnalytics();
   const [loading, setLoading] = React.useState(false);
 
   const fetchMeta = React.useCallback(async () => {
@@ -59,7 +59,7 @@ const Database: React.FC = () => {
             <p className="opacity-90">Veja o estado dos dados e importe novas planilhas sem duplicar.</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="topbar" onClick={fetchMeta} disabled={loading}>{loading ? 'Atualizando...' : 'Atualizar'}</Button>
+            <Button variant="topbar" onClick={async () => { await refresh(); await fetchMeta(); }} disabled={loading}>{loading ? 'Atualizando...' : 'Atualizar'}</Button>
           </div>
         </div>
       </section>
