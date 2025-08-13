@@ -199,17 +199,32 @@ const parseTransactionsFile = (buffer: Buffer) => {
     withdrawalIndex
   });
   
-  return rows
-    .filter((row: any) => row[customerIdIndex] && row[dateIndex]) // customer_id e date
-    .map((row: any) => ({
+  console.log(`📊 Processando ${rows.length.toLocaleString()} linhas de transações`);
+  
+  const validRows = rows.filter((row: any) => row[customerIdIndex] && row[dateIndex]);
+  console.log(`✅ ${validRows.length.toLocaleString()} linhas válidas encontradas`);
+  
+  let processedCount = 0;
+  const results = validRows.map((row: any) => {
+    processedCount++;
+    
+    // Log de progresso a cada 10000 registros
+    if (processedCount % 10000 === 0) {
+      console.log(`⏳ Processados ${processedCount.toLocaleString()} de ${validRows.length.toLocaleString()} registros (${(processedCount/validRows.length*100).toFixed(1)}%)`);
+    }
+    
+    return {
       customer_id: String(row[customerIdIndex]),
       date: new Date(row[dateIndex]),
       ggr: Number(row[ggrIndex]) || 0,
       chargeback: Number(row[chargebackIndex]) || 0,
       deposit: Number(row[depositIndex]) || 0,
       withdrawal: Number(row[withdrawalIndex]) || 0,
-    }))
-    .filter((t) => t.customer_id && !isNaN(t.date.getTime()));
+    };
+  }).filter((t) => t.customer_id && !isNaN(t.date.getTime()));
+  
+  console.log(`🎯 Processamento concluído: ${results.length.toLocaleString()} registros válidos`);
+  return results;
 };
 
 // Função para processar arquivo de pagamentos
@@ -257,9 +272,21 @@ const parsePaymentsFile = (buffer: Buffer) => {
     levelIndex
   });
   
-  return rows
-    .filter((row: any) => row[afiliadosIdIndex] && row[dateIndex]) // afiliados_id e date
-    .map((row: any) => ({
+  console.log(`📊 Processando ${rows.length.toLocaleString()} linhas de pagamentos`);
+  
+  const validRows = rows.filter((row: any) => row[afiliadosIdIndex] && row[dateIndex]);
+  console.log(`✅ ${validRows.length.toLocaleString()} linhas válidas encontradas`);
+  
+  let processedCount = 0;
+  const results = validRows.map((row: any) => {
+    processedCount++;
+    
+    // Log de progresso a cada 10000 registros
+    if (processedCount % 10000 === 0) {
+      console.log(`⏳ Processados ${processedCount.toLocaleString()} de ${validRows.length.toLocaleString()} registros (${(processedCount/validRows.length*100).toFixed(1)}%)`);
+    }
+    
+    return {
       clientes_id: row[clientesIdIndex] ? String(row[clientesIdIndex]) : null,
       afiliados_id: String(row[afiliadosIdIndex]),
       date: new Date(row[dateIndex]),
@@ -268,8 +295,11 @@ const parsePaymentsFile = (buffer: Buffer) => {
       status: String(row[statusIndex]) || 'finish',
       classification: String(row[classificationIndex]) || 'normal',
       level: Number(row[levelIndex]) || 1,
-    }))
-    .filter((p) => !!p.afiliados_id && !isNaN(p.date.getTime()));
+    };
+  }).filter((p) => !!p.afiliados_id && !isNaN(p.date.getTime()));
+  
+  console.log(`🎯 Processamento concluído: ${results.length.toLocaleString()} registros válidos`);
+  return results;
 };
 
 // Rota para importar transações
@@ -292,8 +322,8 @@ app.post('/api/import/transactions', upload.single('file'), async (req, res) => 
     const client = await getNeonClient();
     
     // Preparar dados para inserção
-    const payload = rows.map((r) => ({
-      natural_key: `${r.customer_id}|${r.date.toISOString().split('T')[0]}`,
+    const payload = rows.map((r, index) => ({
+      natural_key: `${r.customer_id}|${r.date.toISOString()}|${r.ggr}|${r.deposit}|${r.withdrawal}|${index}`,
       customer_id: r.customer_id,
       date: r.date.toISOString(),
       ggr: r.ggr,
@@ -312,10 +342,17 @@ app.post('/api/import/transactions', upload.single('file'), async (req, res) => 
     let totalInserted = 0;
     let totalUpdated = 0;
 
-    // Inserir em lotes
+    // Inserir em lotes com logs de progresso
     const CHUNK = 1000;
+    const totalChunks = Math.ceil(records.length / CHUNK);
+    
+    console.log(`🔄 Iniciando inserção em ${totalChunks} lotes de ${CHUNK} registros`);
+    
     for (let i = 0; i < records.length; i += CHUNK) {
+      const chunkIndex = Math.floor(i / CHUNK) + 1;
       const chunk = records.slice(i, i + CHUNK);
+      
+      console.log(`⏳ Processando lote ${chunkIndex}/${totalChunks} (${chunk.length} registros)`);
       
       const values = chunk.map((_, index) => {
         const baseIndex = index * 7;
@@ -348,9 +385,11 @@ app.post('/api/import/transactions', upload.single('file'), async (req, res) => 
       
       totalInserted += inserted;
       totalUpdated += updated;
+      
+      console.log(`✅ Lote ${chunkIndex}/${totalChunks} concluído: ${inserted} inseridas, ${updated} atualizadas (Total: ${totalInserted + totalUpdated}/${records.length})`);
     }
 
-    console.log(`Importação concluída: ${totalInserted} inseridas, ${totalUpdated} atualizadas`);
+    console.log(`🎉 Importação concluída: ${totalInserted} inseridas, ${totalUpdated} atualizadas`);
 
     res.json({ 
       success: true, 
@@ -389,8 +428,8 @@ app.post('/api/import/payments', upload.single('file'), async (req, res) => {
     const client = await getNeonClient();
     
     // Preparar dados para inserção
-    const payload = rows.map((r) => ({
-      natural_key: `${r.afiliados_id}|${(r.clientes_id ?? 'null')}|${r.date.toISOString().split('T')[0]}|${r.method}|${r.value}`,
+    const payload = rows.map((r, index) => ({
+      natural_key: `${r.afiliados_id}|${(r.clientes_id ?? 'null')}|${r.date.toISOString()}|${r.method}|${r.value}|${r.level}|${index}`,
       clientes_id: r.clientes_id,
       afiliados_id: r.afiliados_id,
       date: r.date.toISOString(),
@@ -411,10 +450,17 @@ app.post('/api/import/payments', upload.single('file'), async (req, res) => {
     let totalInserted = 0;
     let totalUpdated = 0;
 
-    // Inserir em lotes
+    // Inserir em lotes com logs de progresso
     const CHUNK = 1000;
+    const totalChunks = Math.ceil(records.length / CHUNK);
+    
+    console.log(`🔄 Iniciando inserção em ${totalChunks} lotes de ${CHUNK} registros`);
+    
     for (let i = 0; i < records.length; i += CHUNK) {
+      const chunkIndex = Math.floor(i / CHUNK) + 1;
       const chunk = records.slice(i, i + CHUNK);
+      
+      console.log(`⏳ Processando lote ${chunkIndex}/${totalChunks} (${chunk.length} registros)`);
       
       const values = chunk.map((_, index) => {
         const baseIndex = index * 9;
@@ -449,9 +495,11 @@ app.post('/api/import/payments', upload.single('file'), async (req, res) => {
       
       totalInserted += inserted;
       totalUpdated += updated;
+      
+      console.log(`✅ Lote ${chunkIndex}/${totalChunks} concluído: ${inserted} inseridos, ${updated} atualizados (Total: ${totalInserted + totalUpdated}/${records.length})`);
     }
 
-    console.log(`Importação concluída: ${totalInserted} inseridos, ${totalUpdated} atualizados`);
+    console.log(`🎉 Importação concluída: ${totalInserted} inseridos, ${totalUpdated} atualizados`);
 
     res.json({ 
       success: true, 
