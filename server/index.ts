@@ -85,18 +85,49 @@ const parseTransactionsFile = (buffer: Buffer) => {
   const worksheet = workbook.Sheets[sheetName];
   const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
   
-  // Pular cabeçalho
+  if (data.length === 0) return [];
+  
+  // Obter cabeçalhos da primeira linha
+  const headers = data[0] as string[];
   const rows = data.slice(1);
   
+  // Mapear índices das colunas
+  const getColumnIndex = (possibleNames: string[]) => {
+    for (const name of possibleNames) {
+      const index = headers.findIndex(h => 
+        h && h.toString().toLowerCase().includes(name.toLowerCase())
+      );
+      if (index !== -1) return index;
+    }
+    return -1;
+  };
+  
+  const customerIdIndex = getColumnIndex(['customer_id', 'customer', 'cliente']);
+  const dateIndex = getColumnIndex(['date', 'data']);
+  const ggrIndex = getColumnIndex(['ggr']);
+  const chargebackIndex = getColumnIndex(['chargeback']);
+  const depositIndex = getColumnIndex(['deposit', 'deposito', 'valor_deposito']);
+  const withdrawalIndex = getColumnIndex(['withdrawal', 'saque', 'valor_saque']);
+  
+  console.log('Mapeamento de colunas para transações:', {
+    headers,
+    customerIdIndex,
+    dateIndex,
+    ggrIndex,
+    chargebackIndex,
+    depositIndex,
+    withdrawalIndex
+  });
+  
   return rows
-    .filter((row: any) => row[0] && row[1]) // customer_id e date
+    .filter((row: any) => row[customerIdIndex] && row[dateIndex]) // customer_id e date
     .map((row: any) => ({
-      customer_id: String(row[0]),
-      date: new Date(row[1]),
-      ggr: Number(row[2]) || 0,
-      chargeback: Number(row[3]) || 0,
-      deposit: Number(row[4]) || 0,
-      withdrawal: Number(row[5]) || 0,
+      customer_id: String(row[customerIdIndex]),
+      date: new Date(row[dateIndex]),
+      ggr: Number(row[ggrIndex]) || 0,
+      chargeback: Number(row[chargebackIndex]) || 0,
+      deposit: Number(row[depositIndex]) || 0,
+      withdrawal: Number(row[withdrawalIndex]) || 0,
     }))
     .filter((t) => t.customer_id && !isNaN(t.date.getTime()));
 };
@@ -108,20 +139,55 @@ const parsePaymentsFile = (buffer: Buffer) => {
   const worksheet = workbook.Sheets[sheetName];
   const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
   
-  // Pular cabeçalho
+  if (data.length === 0) return [];
+  
+  // Obter cabeçalhos da primeira linha
+  const headers = data[0] as string[];
   const rows = data.slice(1);
   
+  // Mapear índices das colunas
+  const getColumnIndex = (possibleNames: string[]) => {
+    for (const name of possibleNames) {
+      const index = headers.findIndex(h => 
+        h && h.toString().toLowerCase().includes(name.toLowerCase())
+      );
+      if (index !== -1) return index;
+    }
+    return -1;
+  };
+  
+  const clientesIdIndex = getColumnIndex(['clientes_id', 'cliente_id', 'customer_id']);
+  const afiliadosIdIndex = getColumnIndex(['afiliados_id', 'afiliado_id', 'affiliate_id']);
+  const dateIndex = getColumnIndex(['date', 'data']);
+  const valueIndex = getColumnIndex(['value', 'valor']);
+  const methodIndex = getColumnIndex(['method', 'metodo']);
+  const statusIndex = getColumnIndex(['status']);
+  const classificationIndex = getColumnIndex(['classification', 'classificacao']);
+  const levelIndex = getColumnIndex(['level', 'nivel']);
+  
+  console.log('Mapeamento de colunas para pagamentos:', {
+    headers,
+    clientesIdIndex,
+    afiliadosIdIndex,
+    dateIndex,
+    valueIndex,
+    methodIndex,
+    statusIndex,
+    classificationIndex,
+    levelIndex
+  });
+  
   return rows
-    .filter((row: any) => row[0] && row[1]) // afiliados_id e date
+    .filter((row: any) => row[afiliadosIdIndex] && row[dateIndex]) // afiliados_id e date
     .map((row: any) => ({
-      clientes_id: row[0] ? String(row[0]) : null,
-      afiliados_id: String(row[1]),
-      date: new Date(row[2]),
-      value: Number(row[3]) || 0,
-      method: String(row[4]) || 'cpa',
-      status: String(row[5]) || 'finish',
-      classification: String(row[6]) || 'normal',
-      level: Number(row[7]) || 1,
+      clientes_id: row[clientesIdIndex] ? String(row[clientesIdIndex]) : null,
+      afiliados_id: String(row[afiliadosIdIndex]),
+      date: new Date(row[dateIndex]),
+      value: Number(row[valueIndex]) || 0,
+      method: String(row[methodIndex]) || 'cpa',
+      status: String(row[statusIndex]) || 'finish',
+      classification: String(row[classificationIndex]) || 'normal',
+      level: Number(row[levelIndex]) || 1,
     }))
     .filter((p) => !!p.afiliados_id && !isNaN(p.date.getTime()));
 };
@@ -133,11 +199,15 @@ app.post('/api/import/transactions', upload.single('file'), async (req, res) => 
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
+    console.log(`Processando arquivo de transações: ${req.file.originalname}, tamanho: ${req.file.size} bytes`);
+
     const rows = parseTransactionsFile(req.file.buffer);
     
     if (rows.length === 0) {
-      return res.status(400).json({ error: 'Nenhuma transação válida encontrada' });
+      return res.status(400).json({ error: 'Nenhuma transação válida encontrada no arquivo' });
     }
+
+    console.log(`${rows.length} transações válidas encontradas`);
 
     const client = await getNeonClient();
     
@@ -157,14 +227,19 @@ app.post('/api/import/transactions', upload.single('file'), async (req, res) => 
     for (const p of payload) if (!byKey.has(p.natural_key)) byKey.set(p.natural_key, p);
     const records = Array.from(byKey.values());
 
+    console.log(`${records.length} transações únicas após deduplicação`);
+
+    let totalInserted = 0;
+    let totalUpdated = 0;
+
     // Inserir em lotes
     const CHUNK = 1000;
     for (let i = 0; i < records.length; i += CHUNK) {
       const chunk = records.slice(i, i + CHUNK);
       
       const values = chunk.map((_, index) => {
-        const baseIndex = index * 6;
-        return `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6})`;
+        const baseIndex = index * 7;
+        return `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7})`;
       }).join(', ');
       
       const params = chunk.flatMap(record => [
@@ -182,15 +257,27 @@ app.post('/api/import/transactions', upload.single('file'), async (req, res) => 
           chargeback = EXCLUDED.chargeback,
           deposit = EXCLUDED.deposit,
           withdrawal = EXCLUDED.withdrawal
+        RETURNING (xmax = 0) AS inserted
       `;
       
-      await client.query(query, params);
+      const result = await client.query(query, params);
+      
+      // Contar inserções vs atualizações
+      const inserted = result.rows.filter(row => row.inserted).length;
+      const updated = result.rows.length - inserted;
+      
+      totalInserted += inserted;
+      totalUpdated += updated;
     }
+
+    console.log(`Importação concluída: ${totalInserted} inseridas, ${totalUpdated} atualizadas`);
 
     res.json({ 
       success: true, 
-      message: `${records.length} transações importadas com sucesso`,
-      count: records.length
+      message: `Transações importadas com sucesso`,
+      total: records.length,
+      inserted: totalInserted,
+      updated: totalUpdated
     });
 
   } catch (error) {
@@ -209,11 +296,15 @@ app.post('/api/import/payments', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
+    console.log(`Processando arquivo de pagamentos: ${req.file.originalname}, tamanho: ${req.file.size} bytes`);
+
     const rows = parsePaymentsFile(req.file.buffer);
     
     if (rows.length === 0) {
-      return res.status(400).json({ error: 'Nenhum pagamento válido encontrado' });
+      return res.status(400).json({ error: 'Nenhum pagamento válido encontrado no arquivo' });
     }
+
+    console.log(`${rows.length} pagamentos válidos encontrados`);
 
     const client = await getNeonClient();
     
@@ -234,6 +325,11 @@ app.post('/api/import/payments', upload.single('file'), async (req, res) => {
     const byKey = new Map<string, typeof payload[number]>();
     for (const p of payload) if (!byKey.has(p.natural_key)) byKey.set(p.natural_key, p);
     const records = Array.from(byKey.values());
+
+    console.log(`${records.length} pagamentos únicos após deduplicação`);
+
+    let totalInserted = 0;
+    let totalUpdated = 0;
 
     // Inserir em lotes
     const CHUNK = 1000;
@@ -262,15 +358,27 @@ app.post('/api/import/payments', upload.single('file'), async (req, res) => {
           status = EXCLUDED.status,
           classification = EXCLUDED.classification,
           level = EXCLUDED.level
+        RETURNING (xmax = 0) AS inserted
       `;
       
-      await client.query(query, params);
+      const result = await client.query(query, params);
+      
+      // Contar inserções vs atualizações
+      const inserted = result.rows.filter(row => row.inserted).length;
+      const updated = result.rows.length - inserted;
+      
+      totalInserted += inserted;
+      totalUpdated += updated;
     }
+
+    console.log(`Importação concluída: ${totalInserted} inseridos, ${totalUpdated} atualizados`);
 
     res.json({ 
       success: true, 
-      message: `${records.length} pagamentos importados com sucesso`,
-      count: records.length
+      message: `Pagamentos importados com sucesso`,
+      total: records.length,
+      inserted: totalInserted,
+      updated: totalUpdated
     });
 
   } catch (error) {
