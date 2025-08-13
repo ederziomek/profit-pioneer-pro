@@ -9,6 +9,18 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  preview: {
+    host: "0.0.0.0",
+    port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
+    allowedHosts: [
+      "localhost",
+      "127.0.0.1",
+      "0.0.0.0",
+      "healthcheck.railway.app",
+      ".railway.app",
+      ".up.railway.app"
+    ],
+  },
   plugins: [
     react(),
     mode === 'development' &&
