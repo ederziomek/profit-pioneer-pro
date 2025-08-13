@@ -118,6 +118,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_reset_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       is_admin: {
         Args: { _user_id?: string }
         Returns: boolean

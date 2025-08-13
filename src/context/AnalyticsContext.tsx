@@ -127,12 +127,9 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     void (async () => {
       setTransactions(null);
       setPayments(null);
-      const [txDel, pyDel] = await Promise.all([
-        supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-        supabase.from('payments').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-      ]);
-      if (txDel.error || pyDel.error) {
-        toast({ title: 'Erro ao limpar dados', description: (txDel.error || pyDel.error)?.message ?? 'Verifique as políticas RLS.' });
+      const { error } = await supabase.rpc('admin_reset_data');
+      if (error) {
+        toast({ title: 'Erro ao limpar dados', description: error.message });
       } else {
         await refresh();
         toast({ title: 'Dados limpos', description: 'As tabelas foram esvaziadas.' });

@@ -21,7 +21,7 @@ const chartData = rows.map((r) => ({
       <section className="rounded-xl p-8 bg-hero-gradient text-primary-foreground shadow-glow hover:tilt">
         <div className="flex items-start">
           <div>
-            <h1 className="text-3xl font-semibold text-muted-foreground">Dashboard — IG Afiliados Analytics</h1>
+            <h1 className="text-3xl font-semibold text-primary-foreground">Dashboard — IG Afiliados Analytics</h1>
             <p className="opacity-90">Visão geral do desempenho e ROI.</p>
           </div>
         </div>
