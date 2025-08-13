@@ -167,8 +167,39 @@ const parseTransactionsFile = (buffer: Buffer) => {
   
   if (data.length === 0) return [];
   
-  // Obter cabeçalhos da primeira linha
-  const headers = data[0] as string[];
+  // Função para limpar valores monetários brasileiros
+  const cleanMonetaryValue = (value: any): number => {
+    if (typeof value === 'number') return value;
+    if (typeof value !== 'string') return 0;
+    
+    // Remover R$, espaços e tratar valores negativos
+    let cleaned = value
+      .replace(/R\$\s*/g, '')     // Remove R$
+      .replace(/\s+/g, '')        // Remove espaços
+      .replace(/-+/g, '0')        // Converte - para 0
+      .trim();
+    
+    // Se for vazio ou só traços, retornar 0
+    if (!cleaned || cleaned === '0') return 0;
+    
+    // Tratar valores negativos (ex: "-R$ 300.32")
+    const isNegative = value.includes('-') && !value.includes('R$ -');
+    
+    // Remover caracteres não numéricos exceto vírgula e ponto
+    cleaned = cleaned.replace(/[^\d,.-]/g, '');
+    
+    // Converter vírgula decimal para ponto (formato brasileiro)
+    if (cleaned.includes(',')) {
+      // Se tem vírgula, assumir que é decimal brasileiro (ex: 14,97)
+      cleaned = cleaned.replace(',', '.');
+    }
+    
+    const result = parseFloat(cleaned) || 0;
+    return isNegative ? -result : result;
+  };
+  
+  // Obter cabeçalhos da primeira linha e limpar espaços
+  const headers = (data[0] as string[]).map(h => h ? h.toString().trim() : '');
   const rows = data.slice(1);
   
   // Mapear índices das colunas
@@ -216,10 +247,10 @@ const parseTransactionsFile = (buffer: Buffer) => {
     return {
       customer_id: String(row[customerIdIndex]),
       date: parseDate(row[dateIndex]),
-      ggr: parseFloat(row[ggrIndex]) || 0,
-      chargeback: parseFloat(row[chargebackIndex]) || 0,
-      deposit: parseFloat(row[depositIndex]) || 0,
-      withdrawal: parseFloat(row[withdrawalIndex]) || 0,
+      ggr: cleanMonetaryValue(row[ggrIndex]),
+      chargeback: cleanMonetaryValue(row[chargebackIndex]),
+      deposit: cleanMonetaryValue(row[depositIndex]),
+      withdrawal: cleanMonetaryValue(row[withdrawalIndex]),
     };
   }).filter((t) => t.customer_id && !isNaN(t.date.getTime()));
   
@@ -282,8 +313,39 @@ const parsePaymentsFile = (buffer: Buffer) => {
   
   if (data.length === 0) return [];
   
-  // Obter cabeçalhos da primeira linha
-  const headers = data[0] as string[];
+  // Função para limpar valores monetários brasileiros
+  const cleanMonetaryValue = (value: any): number => {
+    if (typeof value === 'number') return value;
+    if (typeof value !== 'string') return 0;
+    
+    // Remover R$, espaços e tratar valores negativos
+    let cleaned = value
+      .replace(/R\$\s*/g, '')     // Remove R$
+      .replace(/\s+/g, '')        // Remove espaços
+      .replace(/-+/g, '0')        // Converte - para 0
+      .trim();
+    
+    // Se for vazio ou só traços, retornar 0
+    if (!cleaned || cleaned === '0') return 0;
+    
+    // Tratar valores negativos (ex: "-R$ 300.32")
+    const isNegative = value.includes('-') && !value.includes('R$ -');
+    
+    // Remover caracteres não numéricos exceto vírgula e ponto
+    cleaned = cleaned.replace(/[^\d,.-]/g, '');
+    
+    // Converter vírgula decimal para ponto (formato brasileiro)
+    if (cleaned.includes(',')) {
+      // Se tem vírgula, assumir que é decimal brasileiro (ex: 14,97)
+      cleaned = cleaned.replace(',', '.');
+    }
+    
+    const result = parseFloat(cleaned) || 0;
+    return isNegative ? -result : result;
+  };
+  
+  // Obter cabeçalhos da primeira linha e limpar espaços
+  const headers = (data[0] as string[]).map(h => h ? h.toString().trim() : '');
   const rows = data.slice(1);
   
   // Mapear índices das colunas
@@ -336,7 +398,7 @@ const parsePaymentsFile = (buffer: Buffer) => {
       clientes_id: row[clientesIdIndex] ? String(row[clientesIdIndex]) : null,
       afiliados_id: String(row[afiliadosIdIndex]),
       date: parseDate(row[dateIndex]),
-      value: parseFloat(row[valueIndex]) || 0,
+      value: cleanMonetaryValue(row[valueIndex]),
       method: String(row[methodIndex]) || 'cpa',
       status: String(row[statusIndex]) || 'finish',
       classification: String(row[classificationIndex]) || 'normal',
