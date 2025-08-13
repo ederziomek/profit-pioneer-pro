@@ -12,6 +12,7 @@ import { SortableHeader } from "@/components/ui/sortable-header";
 const Cohorts = () => {
   const { dataset } = useAnalytics();
   const [granularity, setGranularity] = React.useState<CohortGranularity>("week");
+  const [showDetails, setShowDetails] = React.useState(false);
 
   const rows = React.useMemo(() => {
     if (!dataset) return [];
@@ -40,6 +41,9 @@ const Cohorts = () => {
             <Button variant={granularity === "day" ? "default" : "secondary"} onClick={() => setGranularity("day")}>Diário</Button>
             <Button variant={granularity === "week" ? "default" : "secondary"} onClick={() => setGranularity("week")}>Semanal</Button>
             <Button variant={granularity === "month" ? "default" : "secondary"} onClick={() => setGranularity("month")}>Mensal</Button>
+            <Button variant={showDetails ? "default" : "outline"} onClick={() => setShowDetails(!showDetails)}>
+              {showDetails ? "Ocultar Detalhes" : "Ver Detalhes"}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -55,15 +59,17 @@ const Cohorts = () => {
                   >
                     Período
                   </SortableHeader>
-                  <SortableHeader
-                    sortKey="tempo"
-                    currentSortKey={sortConfig?.key}
-                    currentDirection={sortConfig?.direction}
-                    onSort={handleSort}
-                    align="right"
-                  >
-                    Tempo
-                  </SortableHeader>
+                  {showDetails && (
+                    <SortableHeader
+                      sortKey="tempo"
+                      currentSortKey={sortConfig?.key}
+                      currentDirection={sortConfig?.direction}
+                      onSort={handleSort}
+                      align="right"
+                    >
+                      Tempo
+                    </SortableHeader>
+                  )}
                   <SortableHeader
                     sortKey="customers"
                     currentSortKey={sortConfig?.key}
@@ -82,15 +88,17 @@ const Cohorts = () => {
                   >
                     Depósitos
                   </SortableHeader>
-                  <SortableHeader
-                    sortKey="withdrawals"
-                    currentSortKey={sortConfig?.key}
-                    currentDirection={sortConfig?.direction}
-                    onSort={handleSort}
-                    align="right"
-                  >
-                    Saques
-                  </SortableHeader>
+                  {showDetails && (
+                    <SortableHeader
+                      sortKey="withdrawals"
+                      currentSortKey={sortConfig?.key}
+                      currentDirection={sortConfig?.direction}
+                      onSort={handleSort}
+                      align="right"
+                    >
+                      Saques
+                    </SortableHeader>
+                  )}
                   <SortableHeader
                     sortKey="ggr"
                     currentSortKey={sortConfig?.key}
@@ -100,42 +108,46 @@ const Cohorts = () => {
                   >
                     GGR
                   </SortableHeader>
-                  <SortableHeader
-                    sortKey="chargeback"
-                    currentSortKey={sortConfig?.key}
-                    currentDirection={sortConfig?.direction}
-                    onSort={handleSort}
-                    align="right"
-                  >
-                    Chargeback
-                  </SortableHeader>
-                  <SortableHeader
-                    sortKey="ngr_total"
-                    currentSortKey={sortConfig?.key}
-                    currentDirection={sortConfig?.direction}
-                    onSort={handleSort}
-                    align="right"
-                  >
-                    NGR
-                  </SortableHeader>
-                  <SortableHeader
-                    sortKey="cpa_pago"
-                    currentSortKey={sortConfig?.key}
-                    currentDirection={sortConfig?.direction}
-                    onSort={handleSort}
-                    align="right"
-                  >
-                    CPA Pago
-                  </SortableHeader>
-                  <SortableHeader
-                    sortKey="rev_pago"
-                    currentSortKey={sortConfig?.key}
-                    currentDirection={sortConfig?.direction}
-                    onSort={handleSort}
-                    align="right"
-                  >
-                    REV Pago
-                  </SortableHeader>
+                  {showDetails && (
+                    <>
+                      <SortableHeader
+                        sortKey="chargeback"
+                        currentSortKey={sortConfig?.key}
+                        currentDirection={sortConfig?.direction}
+                        onSort={handleSort}
+                        align="right"
+                      >
+                        Chargeback
+                      </SortableHeader>
+                      <SortableHeader
+                        sortKey="ngr_total"
+                        currentSortKey={sortConfig?.key}
+                        currentDirection={sortConfig?.direction}
+                        onSort={handleSort}
+                        align="right"
+                      >
+                        NGR
+                      </SortableHeader>
+                      <SortableHeader
+                        sortKey="cpa_pago"
+                        currentSortKey={sortConfig?.key}
+                        currentDirection={sortConfig?.direction}
+                        onSort={handleSort}
+                        align="right"
+                      >
+                        CPA Pago
+                      </SortableHeader>
+                      <SortableHeader
+                        sortKey="rev_pago"
+                        currentSortKey={sortConfig?.key}
+                        currentDirection={sortConfig?.direction}
+                        onSort={handleSort}
+                        align="right"
+                      >
+                        REV Pago
+                      </SortableHeader>
+                    </>
+                  )}
                   <SortableHeader
                     sortKey="pago_total"
                     currentSortKey={sortConfig?.key}
@@ -144,15 +156,6 @@ const Cohorts = () => {
                     align="right"
                   >
                     Pago Total
-                  </SortableHeader>
-                  <SortableHeader
-                    sortKey="ltv_total"
-                    currentSortKey={sortConfig?.key}
-                    currentDirection={sortConfig?.direction}
-                    onSort={handleSort}
-                    align="right"
-                  >
-                    LTV
                   </SortableHeader>
                   <SortableHeader
                     sortKey="lucro"
@@ -178,17 +181,20 @@ const Cohorts = () => {
                 {sortedData.map((r) => (
                   <tr key={`${r.granularity}-${r.periodStart.toString()}`} className="border-b last:border-0 hover:bg-muted/50">
                     <td className="py-2">{format(r.periodStart, "dd/MM/yyyy")}</td>
-                    <td className="text-right">{r.tempo}</td>
+                    {showDetails && <td className="text-right">{r.tempo}</td>}
                     <td className="text-right">{r.customers}</td>
                     <td className="text-right">{formatMoney(r.deposits)}</td>
-                    <td className="text-right">{formatMoney(r.withdrawals)}</td>
+                    {showDetails && <td className="text-right">{formatMoney(r.withdrawals)}</td>}
                     <td className="text-right">{formatMoney(r.ggr)}</td>
-                    <td className="text-right">{formatMoney(r.chargeback)}</td>
-                    <td className="text-right">{formatMoney(r.ngr_total)}</td>
-                    <td className="text-right">{formatMoney(r.cpa_pago)}</td>
-                    <td className="text-right">{formatMoney(r.rev_pago)}</td>
+                    {showDetails && (
+                      <>
+                        <td className="text-right">{formatMoney(r.chargeback)}</td>
+                        <td className="text-right">{formatMoney(r.ngr_total)}</td>
+                        <td className="text-right">{formatMoney(r.cpa_pago)}</td>
+                        <td className="text-right">{formatMoney(r.rev_pago)}</td>
+                      </>
+                    )}
                     <td className="text-right">{formatMoney(r.pago_total)}</td>
-                    <td className="text-right">{formatMoney(r.ltv_total)}</td>
                     <td className="text-right">{formatMoney(r.lucro)}</td>
                     <td className="text-right">{r.roi == null ? "—" : `${(r.roi * 100).toFixed(1)}%`}</td>
                   </tr>

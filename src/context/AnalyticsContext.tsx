@@ -177,34 +177,41 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const refresh = React.useCallback(async () => {
     try {
-      console.log('Carregando dados do Neon...');
+      console.log('Carregando dados via API...');
       
-      const client = await getNeonClient();
-      
-      const [txData, pyData] = await Promise.all([
-        client.query('SELECT * FROM transactions ORDER BY date DESC'),
-        client.query('SELECT * FROM payments ORDER BY date DESC'),
+      const [txResponse, pyResponse] = await Promise.all([
+        fetch('/api/transactions'),
+        fetch('/api/payments'),
       ]);
 
-      console.log(`Transações carregadas: ${txData.rows.length}`);
-      console.log(`Pagamentos carregados: ${pyData.rows.length}`);
+      if (!txResponse.ok || !pyResponse.ok) {
+        throw new Error('Erro ao carregar dados da API');
+      }
 
-      if (txData?.rows?.length) {
+      const [txData, pyData] = await Promise.all([
+        txResponse.json(),
+        pyResponse.json(),
+      ]);
+
+      console.log(`Transações carregadas: ${txData.length}`);
+      console.log(`Pagamentos carregados: ${pyData.length}`);
+
+      if (txData?.length) {
         setTransactions(
-          txData.rows.map((t: any) => ({
+          txData.map((t: any) => ({
             customer_id: t.customer_id,
             date: new Date(t.date),
             ggr: Number(t.ggr),
             chargeback: Number(t.chargeback),
-            deposit: Number(t.deposit),
-            withdrawal: Number(t.withdrawal),
+            deposit: Number(t.deposit || t.valor_deposito || 0),
+            withdrawal: Number(t.withdrawal || t.valor_saque || 0),
           }))
         );
       }
       
-      if (pyData?.rows?.length) {
+      if (pyData?.length) {
         setPayments(
-          pyData.rows.map((p: any) => ({
+          pyData.map((p: any) => ({
             clientes_id: p.clientes_id,
             afiliados_id: p.afiliados_id,
             date: new Date(p.date),
@@ -217,12 +224,12 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         );
       }
 
-      console.log('Dados carregados com sucesso do Neon!');
+      console.log('Dados carregados com sucesso via API!');
     } catch (error) {
-      console.error('Erro ao carregar dados do Neon:', error);
+      console.error('Erro ao carregar dados via API:', error);
       toast({ 
         title: 'Erro ao carregar dados', 
-        description: 'Não foi possível conectar ao banco Neon. Verifique a conexão.' 
+        description: 'Não foi possível conectar ao banco de dados. Verifique a conexão.' 
       });
     }
   }, []);
