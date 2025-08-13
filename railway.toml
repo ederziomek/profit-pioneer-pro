@@ -2,10 +2,10 @@
 builder = "nixpacks"
 
 [deploy]
-# Forçar novo deploy - servidor ultra-básico para healthcheck
-startCommand = "node server/ultra-basic.js"
+# Servidor completo com frontend React
+startCommand = "npm run build && node server/index.js"
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 60
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
