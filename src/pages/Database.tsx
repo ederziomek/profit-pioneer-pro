@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import DataUploader from "@/components/import/DataUploader";
-import { getNeonClient } from "@/integrations/neon/client";
+import { getNeonClient } from "@/integrations/neon/client-frontend";
 import { startOfWeek, format } from "date-fns";
 import { useAnalytics } from "@/context/AnalyticsContext";
 

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
 import type { Payment, Transaction, CohortSummary, AffiliateSummary, Dataset } from "@/types/analytics";
 import { parsePaymentsFile, parseTransactionsFile, computeAll } from "@/lib/analytics";
-import { getNeonClient } from "@/integrations/neon/client";
+import { getNeonClient } from "@/integrations/neon/client-frontend";
 import { toast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 
