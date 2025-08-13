@@ -23,7 +23,7 @@ export const closeNeonClient = async () => {
 };
 
 // Função para executar queries no Neon
-export const executeNeonQuery = async <T>(query: string, params?: any[]): Promise<T[]> => {
+export const executeNeonQuery = async (query: string, params?: any[]): Promise<any[]> => {
   const client = await getNeonClient();
   try {
     const result = await client.query(query, params);
@@ -35,7 +35,7 @@ export const executeNeonQuery = async <T>(query: string, params?: any[]): Promis
 };
 
 // Função para executar RPC no Neon
-export const executeNeonRPC = async <T>(functionName: string, params?: any): Promise<T[]> => {
+export const executeNeonRPC = async (functionName: string, params?: any): Promise<any[]> => {
   const client = await getNeonClient();
   try {
     // Construir a query RPC
@@ -55,7 +55,7 @@ export const executeNeonRPC = async <T>(functionName: string, params?: any): Pro
 };
 
 // Função para buscar dados paginados
-export const fetchPaginatedData = async <T>(table: string, page: number, pageSize: number, orderBy: string, orderDirection: string): Promise<{ data: T[]; total: number }> {
+export const fetchPaginatedData = async (table: string, page: number, pageSize: number, orderBy: string, orderDirection: string): Promise<{ data: any[]; total: number }> {
   const client = await getNeonClient();
   try {
     // Validar direção de ordenação
@@ -80,7 +80,7 @@ export const fetchPaginatedData = async <T>(table: string, page: number, pageSiz
 };
 
 // Função para buscar todos os dados (para dashboard)
-export const fetchAllData = async <T>(table: string): Promise<T[]> => {
+export const fetchAllData = async (table: string): Promise<any[]> => {
   const client = await getNeonClient();
   try {
     const result = await client.query(`SELECT * FROM ${table} ORDER BY date DESC`);
