@@ -7,7 +7,7 @@ const NEON_DATABASE_URL = process.env.NEON_DATABASE_URL ||
 // Cliente Neon singleton
 let neonClient: Client | null = null;
 
-export const getNeonClient = async (): Promise<Client> => {
+export const getNeonClient = async () => {
   if (!neonClient) {
     neonClient = new Client({ connectionString: NEON_DATABASE_URL });
     await neonClient.connect();
@@ -23,7 +23,7 @@ export const closeNeonClient = async () => {
 };
 
 // Função para executar queries no Neon
-export const executeNeonQuery = async (query: string, params?: any[]): Promise<any[]> => {
+export const executeNeonQuery = async (query: string, params?: any[]) => {
   const client = await getNeonClient();
   try {
     const result = await client.query(query, params);
@@ -35,7 +35,7 @@ export const executeNeonQuery = async (query: string, params?: any[]): Promise<a
 };
 
 // Função para executar RPC no Neon
-export const executeNeonRPC = async (functionName: string, params?: any): Promise<any[]> => {
+export const executeNeonRPC = async (functionName: string, params?: any) => {
   const client = await getNeonClient();
   try {
     // Construir a query RPC
@@ -55,7 +55,7 @@ export const executeNeonRPC = async (functionName: string, params?: any): Promis
 };
 
 // Função para buscar dados paginados
-export const fetchPaginatedData = async (table: string, page: number, pageSize: number, orderBy: string, orderDirection: string): Promise<{ data: any[]; total: number }> {
+export const fetchPaginatedData = async (table: string, page: number, pageSize: number, orderBy: string, orderDirection: string) => {
   const client = await getNeonClient();
   try {
     // Validar direção de ordenação
@@ -80,7 +80,7 @@ export const fetchPaginatedData = async (table: string, page: number, pageSize: 
 };
 
 // Função para buscar todos os dados (para dashboard)
-export const fetchAllData = async (table: string): Promise<any[]> => {
+export const fetchAllData = async (table: string) => {
   const client = await getNeonClient();
   try {
     const result = await client.query(`SELECT * FROM ${table} ORDER BY date DESC`);
