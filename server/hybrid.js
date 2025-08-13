@@ -48,72 +48,132 @@ const nativeServer = http.createServer((req, res) => {
     return;
   }
   
-  // ROTA RAIZ - SEMPRE FUNCIONA
-  if (req.url === '/') {
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Profit Pioneer Pro</title>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-            .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-            .status { padding: 15px; border-radius: 5px; margin: 20px 0; }
-            .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
-            .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
-            .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
-            h1 { color: #2c3e50; text-align: center; }
-            .endpoints { background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; }
-            code { background: #e9ecef; padding: 2px 6px; border-radius: 3px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>🚀 Profit Pioneer Pro</h1>
-            
-            <div class="status success">
-              <strong>✅ Status: Online</strong><br>
-              Servidor híbrido funcionando perfeitamente!
-            </div>
-            
-            <div class="status info">
-              <strong>📊 Informações do Sistema</strong><br>
-              • Timestamp: ${new Date().toLocaleString('pt-BR')}<br>
-              • Uptime: ${Math.floor(process.uptime())} segundos<br>
-              • Ambiente: ${process.env.NODE_ENV || 'development'}<br>
-              • Porta: ${port}
-            </div>
-            
-            <div class="status warning">
-              <strong>⚠️ Modo de Emergência</strong><br>
-              O servidor Express ainda está inicializando. Esta é a versão de emergência.
-            </div>
-            
-            <div class="endpoints">
-              <strong>🔗 Endpoints Disponíveis:</strong><br>
-              • <code>/health</code> - Healthcheck completo<br>
-              • <code>/health/simple</code> - Healthcheck simples (Railway)<br>
-              • <code>/</code> - Esta página<br>
-              • <code>/api/*</code> - API (quando disponível)<br>
-              • <code>/*</code> - Frontend React (quando disponível)
-            </div>
-            
-            <div style="text-align: center; margin-top: 30px; color: #6c757d;">
-              <small>Servidor Híbrido - Sempre Funcionando</small>
+  // Para todas as outras rotas, redirecionar para o servidor Express
+  // ou servir página de "carregando" se Express não estiver pronto
+  res.writeHead(200, { 'Content-Type': 'text/html' });
+  res.end(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Profit Pioneer Pro - Carregando...</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .loading-container { 
+            text-align: center; 
+            color: white;
+            background: rgba(255,255,255,0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+          }
+          .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          h1 { margin: 0 0 20px 0; font-size: 2.5em; }
+          .status { margin: 20px 0; font-size: 1.2em; }
+          .progress { margin: 20px 0; }
+          .progress-bar {
+            width: 300px;
+            height: 6px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 0 auto;
+          }
+          .progress-fill {
+            height: 100%;
+            background: white;
+            border-radius: 3px;
+            animation: progress 3s ease-in-out infinite;
+          }
+          @keyframes progress {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="loading-container">
+          <div class="spinner"></div>
+          <h1>🚀 Profit Pioneer Pro</h1>
+          <div class="status">Inicializando sistema...</div>
+          <div class="progress">
+            <div class="progress-bar">
+              <div class="progress-fill"></div>
             </div>
           </div>
-        </body>
-      </html>
-    `);
-    return;
-  }
-  
-  // 404 - SEMPRE FUNCIONA
-  res.writeHead(404, { 'Content-Type': 'text/plain' });
-  res.end('Not Found - Servidor em modo de emergência');
+          <div class="status">Aguarde, o frontend React está sendo carregado...</div>
+        </div>
+        
+        <script>
+          // Tentar acessar o servidor Express a cada 2 segundos
+          let attempts = 0;
+          const maxAttempts = 30; // 1 minuto máximo
+          
+          function checkExpressServer() {
+            attempts++;
+            
+            fetch('/api/counts')
+              .then(response => {
+                if (response.ok) {
+                  // Servidor Express está funcionando, redirecionar
+                  window.location.reload();
+                } else {
+                  throw new Error('API não está pronta');
+                }
+              })
+              .catch(error => {
+                if (attempts < maxAttempts) {
+                  setTimeout(checkExpressServer, 2000);
+                } else {
+                  // Timeout - mostrar erro
+                  document.querySelector('.loading-container').innerHTML = \`
+                    <h1>⚠️ Erro de Inicialização</h1>
+                    <div class="status">O servidor não conseguiu inicializar completamente.</div>
+                    <div class="status">Tente recarregar a página em alguns segundos.</div>
+                    <button onclick="window.location.reload()" style="
+                      background: white; 
+                      color: #667eea; 
+                      border: none; 
+                      padding: 15px 30px; 
+                      border-radius: 25px; 
+                      font-size: 16px; 
+                      cursor: pointer;
+                      margin-top: 20px;
+                    ">🔄 Recarregar Página</button>
+                  \`;
+                }
+              });
+          }
+          
+          // Iniciar verificação após 3 segundos
+          setTimeout(checkExpressServer, 3000);
+        </script>
+      </body>
+    </html>
+  `);
 });
 
 // Iniciar servidor nativo (SEMPRE FUNCIONA)
@@ -443,28 +503,34 @@ const initExpressServer = async () => {
       }
     });
     
-    // Servir arquivos estáticos do frontend
+    // IMPORTANTE: Servir arquivos estáticos do frontend ANTES das rotas da API
     expressApp.use(express.static(path.join(__dirname, '../dist')));
     
-    // Rota catch-all para SPA
+    // Rota catch-all para SPA - DEVE SER A ÚLTIMA
     expressApp.get('*', (req, res) => {
       res.sendFile(path.join(__dirname, '../dist/index.html'));
     });
     
-    // Iniciar servidor Express
-    expressServer = expressApp.listen(port + 1, '0.0.0.0', () => {
+    // Iniciar servidor Express na MESMA porta do nativo
+    expressServer = expressApp.listen(port, '0.0.0.0', () => {
       console.log('=================================');
       console.log('🚀 SERVIDOR EXPRESS INICIADO!');
       console.log('=================================');
-      console.log(`📍 Porta: ${port + 1}`);
-      console.log(`🔗 Frontend: http://localhost:${port + 1}`);
-      console.log(`⚡ API: http://localhost:${port + 1}/api`);
+      console.log(`📍 Porta: ${port}`);
+      console.log(`🔗 Frontend React: http://localhost:${port}`);
+      console.log(`⚡ API: http://localhost:${port}/api`);
       console.log('=================================');
       console.log('✅ SISTEMA COMPLETO FUNCIONANDO!');
       console.log('=================================');
+      
+      // Fechar servidor nativo quando Express estiver funcionando
+      setTimeout(() => {
+        nativeServer.close(() => {
+          console.log('🔄 Servidor nativo fechado - Express assumindo controle');
+        });
+      }, 2000);
     });
     
-    // Atualizar healthcheck para indicar que Express está funcionando
     console.log('✅ Servidor Express inicializado com sucesso!');
     
   } catch (error) {
@@ -474,7 +540,7 @@ const initExpressServer = async () => {
 };
 
 // Inicializar servidor Express após um delay
-setTimeout(initExpressServer, 5000);
+setTimeout(initExpressServer, 3000);
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
