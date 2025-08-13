@@ -6,32 +6,47 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
 // Função para executar queries diretas via API
 export const executeDirectQuery = async (query: string) => {
   try {
-    if (query.includes('COUNT(*) FROM transactions')) {
+    if (query.includes('COUNT(*) as count FROM transactions')) {
       const response = await fetch(`${API_BASE_URL}/api/counts`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       const data = await response.json();
       return { rows: [{ count: data.transactions.toString() }] };
     }
     
-    if (query.includes('COUNT(*) FROM payments')) {
+    if (query.includes('COUNT(*) as count FROM payments')) {
       const response = await fetch(`${API_BASE_URL}/api/counts`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       const data = await response.json();
       return { rows: [{ count: data.payments.toString() }] };
     }
     
     if (query.includes('SELECT * FROM transactions')) {
       const response = await fetch(`${API_BASE_URL}/api/transactions`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       const data = await response.json();
       return { rows: data };
     }
     
     if (query.includes('SELECT * FROM payments')) {
       const response = await fetch(`${API_BASE_URL}/api/payments`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       const data = await response.json();
       return { rows: data };
     }
     
     if (query.includes('date_trunc')) {
       const response = await fetch(`${API_BASE_URL}/api/weeks`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       const data = await response.json();
       
       if (query.includes('transactions')) {

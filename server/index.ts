@@ -526,6 +526,68 @@ app.get('/api/weeks', async (req, res) => {
   }
 });
 
+// Rota para buscar todas as transações
+app.get('/api/transactions', async (req, res) => {
+  try {
+    const client = await getNeonClient();
+    const { limit, offset } = req.query;
+    
+    let query = 'SELECT * FROM transactions ORDER BY date DESC';
+    const params: any[] = [];
+    
+    if (limit) {
+      query += ' LIMIT $1';
+      params.push(parseInt(limit as string));
+      
+      if (offset) {
+        query += ' OFFSET $2';
+        params.push(parseInt(offset as string));
+      }
+    }
+    
+    const result = await client.query(query, params);
+    res.json(result.rows);
+
+  } catch (error) {
+    console.error('Erro ao buscar transações:', error);
+    res.status(500).json({ 
+      error: 'Erro ao buscar transações', 
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
+// Rota para buscar todos os pagamentos
+app.get('/api/payments', async (req, res) => {
+  try {
+    const client = await getNeonClient();
+    const { limit, offset } = req.query;
+    
+    let query = 'SELECT * FROM payments ORDER BY date DESC';
+    const params: any[] = [];
+    
+    if (limit) {
+      query += ' LIMIT $1';
+      params.push(parseInt(limit as string));
+      
+      if (offset) {
+        query += ' OFFSET $2';
+        params.push(parseInt(offset as string));
+      }
+    }
+    
+    const result = await client.query(query, params);
+    res.json(result.rows);
+
+  } catch (error) {
+    console.error('Erro ao buscar pagamentos:', error);
+    res.status(500).json({ 
+      error: 'Erro ao buscar pagamentos', 
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
 // Rota para resetar dados
 app.post('/api/reset', async (req, res) => {
   try {
