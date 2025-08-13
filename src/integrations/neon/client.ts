@@ -1,8 +1,5 @@
 import { Client } from 'pg';
 
-// Tipos para direção de ordenação
-type OrderDirection = 'ASC' | 'DESC';
-
 // Configuração do Neon
 const NEON_DATABASE_URL = process.env.NEON_DATABASE_URL || 
   "postgresql://neondb_owner:npg_SjN6yxOIKnc1@ep-green-surf-adprt5l3-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
@@ -63,10 +60,13 @@ export const fetchPaginatedData = async <T>(
   page: number, 
   pageSize: number, 
   orderBy: string,
-  orderDirection: OrderDirection
+  orderDirection: string
 ): Promise<{ data: T[]; total: number }> {
   const client = await getNeonClient();
   try {
+    // Validar direção de ordenação
+    const validDirection = orderDirection.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    
     // Buscar total de registros
     const countResult = await client.query(`SELECT COUNT(*) FROM ${table}`);
     const total = parseInt(countResult.rows[0].count);
@@ -74,7 +74,7 @@ export const fetchPaginatedData = async <T>(
     // Buscar dados paginados
     const offset = (page - 1) * pageSize;
     const dataResult = await client.query(
-      `SELECT * FROM ${table} ORDER BY ${orderBy} ${orderDirection} LIMIT $1 OFFSET $2`,
+      `SELECT * FROM ${table} ORDER BY ${orderBy} ${validDirection} LIMIT $1 OFFSET $2`,
       [pageSize, offset]
     );
     
