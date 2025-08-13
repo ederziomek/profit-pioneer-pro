@@ -1,7 +1,7 @@
 import { Client } from 'pg';
 
-// Configuração do Neon
-const NEON_DATABASE_URL = process.env.NEON_DATABASE_URL || 
+// Configuração do Neon - usando variáveis definidas pelo Vite
+const NEON_DATABASE_URL = (typeof __NEON_DATABASE_URL__ !== 'undefined' ? __NEON_DATABASE_URL__ : null) || 
   "postgresql://neondb_owner:npg_SjN6yxOIKnc1@ep-green-surf-adprt5l3-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
 
 // Cliente Neon singleton

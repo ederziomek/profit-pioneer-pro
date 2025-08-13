@@ -19,4 +19,17 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  define: {
+    // Substituir process.env durante o build
+    'process.env': process.env,
+    // Definir variáveis de ambiente específicas
+    __NEON_DATABASE_URL__: JSON.stringify(process.env.NEON_DATABASE_URL),
+    __SUPABASE_URL__: JSON.stringify(process.env.SUPABASE_URL),
+    __SUPABASE_ANON_KEY__: JSON.stringify(process.env.SUPABASE_ANON_KEY),
+  },
+  build: {
+    rollupOptions: {
+      external: ['pg'], // Excluir pg do bundle do frontend
+    },
+  },
 }));
