@@ -2,7 +2,7 @@
 builder = "nixpacks"
 
 [deploy]
-# FORÇAR NOVO DEPLOY - Servidor express-complete.js com TODAS AS COLUNAS
+# FORÇAR NOVO DEPLOY URGENTE - Servidor express-complete.js com TODAS AS COLUNAS
 startCommand = "npm run build && node server/express-complete.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 60
