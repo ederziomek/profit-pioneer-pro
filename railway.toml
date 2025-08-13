@@ -2,10 +2,10 @@
 builder = "nixpacks"
 
 [deploy]
-# Servidor completo com frontend React
-startCommand = "npm run build && node server/index.js"
+# Servidor híbrido - healthcheck GARANTIDO + frontend completo
+startCommand = "npm run build && node server/hybrid.js"
 healthcheckPath = "/health"
-healthcheckTimeout = 60
+healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
