@@ -2,8 +2,8 @@
 builder = "nixpacks"
 
 [deploy]
-# Servidor Express simples - frontend React funcionando desde o início
-startCommand = "npm run build && node server/express-simple.js"
+# Servidor Express CORRIGIDO - healthcheck sempre responde, mesmo sem banco
+startCommand = "npm run build && node server/express-corrected.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 60
 restartPolicyType = "on_failure"
@@ -11,3 +11,8 @@ restartPolicyMaxRetries = 10
 
 [deploy.envs]
 NODE_ENV = "production"
+# IMPORTANTE: Configure estas variáveis no painel do Railway:
+# NEON_DATABASE_URL = "postgresql://user:password@host/database?sslmode=require"
+# NEON_HOST = "ep-green-surf-adprt5l3-pooler.c-2.us-east-1.aws.neon.tech"
+# NEON_DATABASE = "neondb"
+# NEON_USER = "neondb_owner"
