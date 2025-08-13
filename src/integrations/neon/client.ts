@@ -55,13 +55,7 @@ export const executeNeonRPC = async <T>(functionName: string, params?: any): Pro
 };
 
 // Função para buscar dados paginados
-export const fetchPaginatedData = async <T>(
-  table: string, 
-  page: number, 
-  pageSize: number, 
-  orderBy: string,
-  orderDirection: string
-): Promise<{ data: T[]; total: number }> {
+export const fetchPaginatedData = async <T>(table: string, page: number, pageSize: number, orderBy: string, orderDirection: string): Promise<{ data: T[]; total: number }> {
   const client = await getNeonClient();
   try {
     // Validar direção de ordenação
