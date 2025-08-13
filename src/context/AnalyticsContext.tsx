@@ -39,7 +39,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const refresh = React.useCallback(async () => {
     // Paginate to load ALL rows (PostgREST has default 1,000 row limit)
-    const PAGE = 20000;
+    const PAGE = 1000;
 
     const fetchAll = async (table: 'transactions' | 'payments') => {
       const results: any[] = [];
