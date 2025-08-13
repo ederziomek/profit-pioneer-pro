@@ -74,7 +74,32 @@ const parseDate = (v: any): Date => {
 export async function parseTransactionsFile(file: File): Promise<Transaction[]> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
+
+  // Heuristic: pick the sheet that looks most like transactions
+  const pickTxSheet = () => {
+    let best = wb.SheetNames[0];
+    let bestScore = -1;
+    for (const name of wb.SheetNames) {
+      const ws = wb.Sheets[name];
+      try {
+        const headerRows: any[] = XLSX.utils.sheet_to_json(ws, { header: 1, range: 0, blankrows: false });
+        const header = (headerRows[0] || []).map((c: any) => normalizeKey(c));
+        const set = new Set(header);
+        const hasId = ['customer_id','clientes_id','cliente_id','cliente','id_cliente','id'].some(k => set.has(k));
+        const hasDate = ['date','data','created_at','dt'].some(k => set.has(k));
+        const hasValue = ['ggr','ggr_total','gross_gaming_revenue','deposit','deposito','deposits','valor_deposito','withdrawal','withdrawals','saque','saques','valor_saque','saque_total','saques_total','retirada','retiradas','cashout','cash_out','withdraw'].some(k => set.has(k));
+        let score = 0;
+        if (hasId) score += 2;
+        if (hasDate) score += 2;
+        if (hasValue) score += 2;
+        if (/transa|tx/i.test(name)) score += 1;
+        if (score > bestScore) { bestScore = score; best = name; }
+      } catch {}
+    }
+    return best;
+  };
+
+  const ws = wb.Sheets[pickTxSheet()];
   const rows = XLSX.utils.sheet_to_json<any>(ws, { defval: null, raw: true });
   const mapped = rows.map((r) => {
     const n = normalizeRow(r);
@@ -94,7 +119,32 @@ export async function parseTransactionsFile(file: File): Promise<Transaction[]> 
 export async function parsePaymentsFile(file: File): Promise<Payment[]> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
-  const ws = wb.Sheets["pagamentos_cpa_rev"] ?? wb.Sheets[wb.SheetNames[0]];
+
+  // Heuristic: pick the sheet that looks most like payments (CPA/REV)
+  const pickPySheet = () => {
+    let best = wb.SheetNames[0];
+    let bestScore = -1;
+    for (const name of wb.SheetNames) {
+      const ws = wb.Sheets[name];
+      try {
+        const headerRows: any[] = XLSX.utils.sheet_to_json(ws, { header: 1, range: 0, blankrows: false });
+        const header = (headerRows[0] || []).map((c: any) => normalizeKey(c));
+        const set = new Set(header);
+        const hasAff = ['afiliados_id','afiliado_id','afiliado'].some(k => set.has(k));
+        const hasDate = ['date','data','dt'].some(k => set.has(k));
+        const hasVals = ['value','valor','method','tipo','status'].some(k => set.has(k));
+        let score = 0;
+        if (hasAff) score += 2;
+        if (hasDate) score += 2;
+        if (hasVals) score += 2;
+        if (/pagamento|cpa|rev/i.test(name)) score += 1;
+        if (score > bestScore) { bestScore = score; best = name; }
+      } catch {}
+    }
+    return best;
+  };
+
+  const ws = wb.Sheets[pickPySheet()];
   const rows = XLSX.utils.sheet_to_json<any>(ws, { defval: null, raw: true });
   return rows.map((r) => {
     const n = normalizeRow(r);
@@ -108,7 +158,7 @@ export async function parsePaymentsFile(file: File): Promise<Payment[]> {
       classification: String(n.classification ?? n.classificacao ?? "Jogador"),
       level: Number(n.level ?? n.nivel ?? 1),
     } as Payment;
-  });
+  }).filter((p) => !!p.afiliados_id && !isNaN(p.date.getTime()));
 }
 
 export const getCohortWeek = (d: Date) => startOfWeek(d, { weekStartsOn: 1 });

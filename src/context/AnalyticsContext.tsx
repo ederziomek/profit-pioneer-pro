@@ -84,6 +84,14 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       withdrawal: r.withdrawal,
     }));
 
+    if (rows.length > 0) {
+      const minDate = new Date(Math.min(...rows.map(r => r.date.getTime())));
+      const maxDate = new Date(Math.max(...rows.map(r => r.date.getTime())));
+      toast({ title: 'Prévia de Transações', description: `${rows.length} linhas (${format(minDate,'dd/MM/yyyy')} a ${format(maxDate,'dd/MM/yyyy')})` });
+    } else {
+      toast({ title: 'Nenhuma transação encontrada', description: 'Verifique a planilha (abas e colunas).' });
+    }
+
     const { error } = await supabase
       .from('transactions')
       .upsert(payload, { onConflict: 'natural_key', ignoreDuplicates: true });
@@ -109,6 +117,14 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       classification: r.classification,
       level: r.level,
     }));
+
+    if (rows.length > 0) {
+      const minDate = new Date(Math.min(...rows.map(r => r.date.getTime())));
+      const maxDate = new Date(Math.max(...rows.map(r => r.date.getTime())));
+      toast({ title: 'Prévia de Pagamentos', description: `${rows.length} linhas (${format(minDate,'dd/MM/yyyy')} a ${format(maxDate,'dd/MM/yyyy')})` });
+    } else {
+      toast({ title: 'Nenhum pagamento encontrado', description: 'Verifique a planilha (abas e colunas: afiliado, data, valor, status, método).' });
+    }
 
     const { error } = await supabase
       .from('payments')
