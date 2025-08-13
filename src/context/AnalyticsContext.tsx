@@ -92,17 +92,25 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toast({ title: 'Nenhuma transação encontrada', description: 'Verifique a planilha (abas e colunas).' });
     }
 
-    const { error } = await supabase
-      .from('transactions')
-      .upsert(payload, { onConflict: 'natural_key', ignoreDuplicates: true });
+    // Dedup e envio em lotes para evitar timeout no banco
+    const byKey = new Map<string, typeof payload[number]>();
+    for (const p of payload) if (!byKey.has(p.natural_key)) byKey.set(p.natural_key, p);
+    const records = Array.from(byKey.values());
 
-    if (error) {
-      toast({ title: 'Erro ao salvar Transações', description: error.message });
-      return;
+    const CHUNK = 1000;
+    for (let i = 0; i < records.length; i += CHUNK) {
+      const chunk = records.slice(i, i + CHUNK);
+      const { error } = await supabase
+        .from('transactions')
+        .upsert(chunk, { onConflict: 'natural_key', ignoreDuplicates: true });
+      if (error) {
+        toast({ title: 'Erro ao salvar Transações', description: error.message });
+        return;
+      }
     }
 
     await refresh();
-    toast({ title: 'Transações importadas', description: `${rows.length} linhas processadas (sem duplicar).` });
+    toast({ title: 'Transações importadas', description: `${records.length.toLocaleString()} linhas processadas (deduplicadas).` });
   };
   const importPayments = async (file: File) => {
     const rows = await parsePaymentsFile(file);
@@ -126,17 +134,25 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toast({ title: 'Nenhum pagamento encontrado', description: 'Verifique a planilha (abas e colunas: afiliado, data, valor, status, método).' });
     }
 
-    const { error } = await supabase
-      .from('payments')
-      .upsert(payload, { onConflict: 'natural_key', ignoreDuplicates: true });
+    // Dedup e envio em lotes para evitar timeout
+    const byKey = new Map<string, typeof payload[number]>();
+    for (const p of payload) if (!byKey.has(p.natural_key)) byKey.set(p.natural_key, p);
+    const records = Array.from(byKey.values());
 
-    if (error) {
-      toast({ title: 'Erro ao salvar Pagamentos', description: error.message });
-      return;
+    const CHUNK = 1000;
+    for (let i = 0; i < records.length; i += CHUNK) {
+      const chunk = records.slice(i, i + CHUNK);
+      const { error } = await supabase
+        .from('payments')
+        .upsert(chunk, { onConflict: 'natural_key', ignoreDuplicates: true });
+      if (error) {
+        toast({ title: 'Erro ao salvar Pagamentos', description: error.message });
+        return;
+      }
     }
 
     await refresh();
-    toast({ title: 'Pagamentos importados', description: `${rows.length} linhas processadas (sem duplicar).` });
+    toast({ title: 'Pagamentos importados', description: `${records.length.toLocaleString()} linhas processadas (deduplicadas).` });
   };
   React.useEffect(() => {
     // Carrega dados do Supabase ao iniciar
