@@ -126,6 +126,20 @@ export type Database = {
         Args: { _user_id?: string }
         Returns: boolean
       }
+      list_weeks_payments: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          week_start: string
+          cnt: number
+        }[]
+      }
+      list_weeks_transactions: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          week_start: string
+          cnt: number
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user"

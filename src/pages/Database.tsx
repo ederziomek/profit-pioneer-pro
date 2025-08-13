@@ -27,26 +27,18 @@ const Database: React.FC = () => {
       setTxCount(txHead.count ?? 0);
       setPyCount(pyHead.count ?? 0);
 
-      const [txDates, pyDates] = await Promise.all([
-        supabase.from('transactions').select('date').order('date', { ascending: true }),
-        supabase.from('payments').select('date').order('date', { ascending: true }),
+      const [txWeeksRes, pyWeeksRes] = await Promise.all([
+        supabase.rpc('list_weeks_transactions'),
+        supabase.rpc('list_weeks_payments'),
       ]);
 
-      const toWeeks = (rows?: { date: string }[]) => {
+      const mapWeeks = (rows?: { week_start: string | Date }[]) => {
         if (!rows) return [] as string[];
-        const set = new Set<number>();
-        rows.forEach((r) => {
-          const d = new Date(r.date);
-          const wk = startOfWeek(d, { weekStartsOn: 1 }).getTime();
-          set.add(wk);
-        });
-        return Array.from(set)
-          .sort((a, b) => a - b)
-          .map((ts) => format(new Date(ts), 'dd/MM'));
+        return rows.map((r) => format(new Date(r.week_start as any), 'dd/MM'));
       };
 
-      setTxWeeks(toWeeks(txDates.data as any));
-      setPyWeeks(toWeeks(pyDates.data as any));
+      setTxWeeks(mapWeeks(txWeeksRes.data as any));
+      setPyWeeks(mapWeeks(pyWeeksRes.data as any));
     } finally {
       setLoading(false);
     }

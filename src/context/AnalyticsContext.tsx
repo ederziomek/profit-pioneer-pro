@@ -37,17 +37,40 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [dataset]);
 
   const refresh = React.useCallback(async () => {
-    const [txRes, pyRes] = await Promise.all([
-      supabase.from('transactions').select('*').order('date', { ascending: true }),
-      supabase.from('payments').select('*').order('date', { ascending: true }),
+    // Paginate to load ALL rows (PostgREST has default 1,000 row limit)
+    const PAGE = 20000;
+
+    const fetchAll = async (table: 'transactions' | 'payments') => {
+      const results: any[] = [];
+      let from = 0;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase
+          .from(table)
+          .select('*')
+          .order('date', { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) {
+          console.error(`Erro ao carregar ${table}:`, error);
+          break;
+        }
+        const len = data?.length ?? 0;
+        if (!len) break;
+        results.push(...(data as any[]));
+        if (len < PAGE) break;
+        from += PAGE;
+      }
+      return results;
+    };
+
+    const [txData, pyData] = await Promise.all([
+      fetchAll('transactions'),
+      fetchAll('payments'),
     ]);
 
-    if (txRes.error) console.error('Erro ao carregar transações:', txRes.error);
-    if (pyRes.error) console.error('Erro ao carregar pagamentos:', pyRes.error);
-
-    if (txRes.data) {
+    if (txData?.length) {
       setTransactions(
-        txRes.data.map((t: any) => ({
+        txData.map((t: any) => ({
           customer_id: t.customer_id,
           date: new Date(t.date),
           ggr: Number(t.ggr),
@@ -57,9 +80,9 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }))
       );
     }
-    if (pyRes.data) {
+    if (pyData?.length) {
       setPayments(
-        pyRes.data.map((p: any) => ({
+        pyData.map((p: any) => ({
           clientes_id: p.clientes_id,
           afiliados_id: p.afiliados_id,
           date: new Date(p.date),
