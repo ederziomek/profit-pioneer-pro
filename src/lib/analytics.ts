@@ -77,6 +77,10 @@ export async function parseTransactionsFile(file: File): Promise<Transaction[]> 
 
   // Heuristic: pick the sheet that looks most like transactions
   const pickTxSheet = () => {
+    // 1) Strong preference for a tab named "Base"
+    const prefer = wb.SheetNames.find(n => n.toLowerCase() === 'base');
+    if (prefer) return prefer;
+
     let best = wb.SheetNames[0];
     let bestScore = -1;
     for (const name of wb.SheetNames) {
@@ -122,6 +126,10 @@ export async function parsePaymentsFile(file: File): Promise<Payment[]> {
 
   // Heuristic: pick the sheet that looks most like payments (CPA/REV)
   const pickPySheet = () => {
+    // 1) Strong preference for a tab named "Base"
+    const prefer = wb.SheetNames.find(n => n.toLowerCase() === 'base');
+    if (prefer) return prefer;
+
     let best = wb.SheetNames[0];
     let bestScore = -1;
     for (const name of wb.SheetNames) {
