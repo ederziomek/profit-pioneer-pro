@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo, useState } from "react";
 import type { Payment, Transaction, CohortSummary, AffiliateSummary, Dataset } from "@/types/analytics";
 import { parsePaymentsFile, parseTransactionsFile, computeAll } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllData, fetchPaginatedData, executeNeonRPC, getNeonClient } from "@/integrations/neon/client";
 import { toast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 
@@ -42,78 +43,59 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return computeAll(dataset);
   }, [dataset]);
 
-  // Função para buscar transações paginadas
+  // Função para buscar transações paginadas do Neon
   const getPaginatedTransactions = React.useCallback(async (page: number, pageSize: number) => {
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
+    try {
+      const { data, total } = await fetchPaginatedData<any>('transactions', page, pageSize, 'date', 'DESC');
+      
+      const formattedData = data.map((t: any) => ({
+        customer_id: t.customer_id,
+        date: new Date(t.date),
+        ggr: Number(t.ggr),
+        chargeback: Number(t.chargeback),
+        deposit: Number(t.deposit),
+        withdrawal: Number(t.withdrawal),
+      }));
 
-    const { data, error, count } = await supabase
-      .from('transactions')
-      .select('*', { count: 'exact' })
-      .order('date', { ascending: true })
-      .range(from, to);
-
-    if (error) {
-      console.error('Erro ao carregar transações:', error);
+      return { data: formattedData, total };
+    } catch (error) {
+      console.error('Erro ao carregar transações do Neon:', error);
       return { data: [], total: 0 };
     }
-
-    const formattedData = (data || []).map((t: any) => ({
-      customer_id: t.customer_id,
-      date: new Date(t.date),
-      ggr: Number(t.ggr),
-      chargeback: Number(t.chargeback),
-      deposit: Number(t.deposit),
-      withdrawal: Number(t.withdrawal),
-    }));
-
-    return { data: formattedData, total: count || 0 };
   }, []);
 
-  // Função para buscar pagamentos paginados
+  // Função para buscar pagamentos paginados do Neon
   const getPaginatedPayments = React.useCallback(async (page: number, pageSize: number) => {
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
+    try {
+      const { data, total } = await fetchPaginatedData<any>('payments', page, pageSize, 'date', 'DESC');
+      
+      const formattedData = data.map((p: any) => ({
+        clientes_id: p.clientes_id,
+        afiliados_id: p.afiliados_id,
+        date: new Date(p.date),
+        value: Number(p.value),
+        method: p.method,
+        status: p.status,
+        classification: p.classification,
+        level: Number(p.level),
+      }));
 
-    const { data, error, count } = await supabase
-      .from('payments')
-      .select('*', { count: 'exact' })
-      .order('date', { ascending: true })
-      .range(from, to);
-
-    if (error) {
-      console.error('Erro ao carregar pagamentos:', error);
+      return { data: formattedData, total };
+    } catch (error) {
+      console.error('Erro ao carregar pagamentos do Neon:', error);
       return { data: [], total: 0 };
     }
-
-    const formattedData = (data || []).map((p: any) => ({
-      clientes_id: p.clientes_id,
-      afiliados_id: p.afiliados_id,
-      date: new Date(p.date),
-      value: Number(p.value),
-      method: p.method,
-      status: p.status,
-      classification: p.classification,
-      level: Number(p.level),
-    }));
-
-    return { data: formattedData, total: count || 0 };
   }, []);
 
-  // Função para buscar afiliados paginados com computação no backend
+  // Função para buscar afiliados paginados do Neon (usando RPC)
   const getPaginatedAffiliates = React.useCallback(async (page: number, pageSize: number, dateRange?: { start: Date; end: Date }) => {
     try {
-      const { data, error } = await supabase.rpc('get_affiliates_paginated', {
+      const data = await executeNeonRPC<any>('get_affiliates_paginated', {
         _page: page,
         _page_size: pageSize,
         _start_date: dateRange?.start?.toISOString() || null,
         _end_date: dateRange?.end?.toISOString() || null
       });
-
-      if (error) {
-        console.error('Erro ao carregar afiliados paginados:', error);
-        return { data: [], total: 0 };
-      }
 
       if (!data || data.length === 0) {
         return { data: [], total: 0 };
@@ -135,60 +117,59 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       return { data: formattedData, total: totalCount };
     } catch (error) {
-      console.error('Erro ao buscar afiliados paginados:', error);
+      console.error('Erro ao buscar afiliados paginados do Neon:', error);
       return { data: [], total: 0 };
     }
   }, []);
 
   const refresh = React.useCallback(async () => {
-    // Carregar apenas uma amostra para o contexto geral (para gráficos e totais)
-    const SAMPLE_SIZE = 1000;
+    try {
+      console.log('🔄 Carregando dados do Neon...');
+      
+      // Carregar TODOS os dados do Neon para o dashboard
+      const [txData, pyData] = await Promise.all([
+        fetchAllData<any>('transactions'),
+        fetchAllData<any>('payments'),
+      ]);
 
-    const fetchSample = async (table: 'transactions' | 'payments') => {
-      const { data, error } = await supabase
-        .from(table)
-        .select('*')
-        .order('date', { ascending: false }) // Mais recentes primeiro
-        .limit(SAMPLE_SIZE);
+      console.log(`📊 Transações carregadas: ${txData.length}`);
+      console.log(`📊 Pagamentos carregados: ${pyData.length}`);
 
-      if (error) {
-        console.error(`Erro ao carregar ${table}:`, error);
-        return [];
+      if (txData?.length) {
+        setTransactions(
+          txData.map((t: any) => ({
+            customer_id: t.customer_id,
+            date: new Date(t.date),
+            ggr: Number(t.ggr),
+            chargeback: Number(t.chargeback),
+            deposit: Number(t.deposit),
+            withdrawal: Number(t.withdrawal),
+          }))
+        );
+      }
+      
+      if (pyData?.length) {
+        setPayments(
+          pyData.map((p: any) => ({
+            clientes_id: p.clientes_id,
+            afiliados_id: p.afiliados_id,
+            date: new Date(p.date),
+            value: Number(p.value),
+            method: p.method,
+            status: p.status,
+            classification: p.classification,
+            level: Number(p.level),
+          }))
+        );
       }
 
-      return data || [];
-    };
-
-    const [txData, pyData] = await Promise.all([
-      fetchSample('transactions'),
-      fetchSample('payments'),
-    ]);
-
-    if (txData?.length) {
-      setTransactions(
-        txData.map((t: any) => ({
-          customer_id: t.customer_id,
-          date: new Date(t.date),
-          ggr: Number(t.ggr),
-          chargeback: Number(t.chargeback),
-          deposit: Number(t.deposit),
-          withdrawal: Number(t.withdrawal),
-        }))
-      );
-    }
-    if (pyData?.length) {
-      setPayments(
-        pyData.map((p: any) => ({
-          clientes_id: p.clientes_id,
-          afiliados_id: p.afiliados_id,
-          date: new Date(p.date),
-          value: Number(p.value),
-          method: p.method,
-          status: p.status,
-          classification: p.classification,
-          level: Number(p.level),
-        }))
-      );
+      console.log('✅ Dados carregados com sucesso do Neon!');
+    } catch (error) {
+      console.error('💥 Erro ao carregar dados do Neon:', error);
+      toast({ 
+        title: 'Erro ao carregar dados', 
+        description: 'Não foi possível conectar ao banco Neon. Verifique a conexão.' 
+      });
     }
   }, []);
   const importTransactions = async (file: File) => {
@@ -211,26 +192,51 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toast({ title: 'Nenhuma transação encontrada', description: 'Verifique a planilha (abas e colunas).' });
     }
 
-    // Dedup e envio em lotes para evitar timeout no banco
+    // Dedup e envio em lotes para evitar timeout no banco Neon
     const byKey = new Map<string, typeof payload[number]>();
     for (const p of payload) if (!byKey.has(p.natural_key)) byKey.set(p.natural_key, p);
     const records = Array.from(byKey.values());
 
-    const CHUNK = 1000;
-    for (let i = 0; i < records.length; i += CHUNK) {
-      const chunk = records.slice(i, i + CHUNK);
-      const { error } = await supabase
-        .from('transactions')
-        .upsert(chunk, { onConflict: 'natural_key', ignoreDuplicates: true });
-      if (error) {
-        toast({ title: 'Erro ao salvar Transações', description: error.message });
-        return;
+    try {
+      const client = await getNeonClient();
+      const CHUNK = 1000;
+      for (let i = 0; i < records.length; i += CHUNK) {
+        const chunk = records.slice(i, i + CHUNK);
+        
+        // Usar INSERT ... ON CONFLICT para upsert no Neon
+        const values = chunk.map((_, index) => {
+          const baseIndex = index * 6;
+          return `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6})`;
+        }).join(', ');
+        
+        const params = chunk.flatMap(record => [
+          record.natural_key, record.customer_id, record.date, 
+          record.ggr, record.chargeback, record.deposit, record.withdrawal
+        ]);
+        
+        const query = `
+          INSERT INTO transactions (natural_key, customer_id, date, ggr, chargeback, deposit, withdrawal)
+          VALUES ${values}
+          ON CONFLICT (natural_key) DO UPDATE SET
+            customer_id = EXCLUDED.customer_id,
+            date = EXCLUDED.date,
+            ggr = EXCLUDED.ggr,
+            chargeback = EXCLUDED.chargeback,
+            deposit = EXCLUDED.deposit,
+            withdrawal = EXCLUDED.withdrawal
+        `;
+        
+        await client.query(query, params);
       }
+      
+      await refresh();
+      toast({ title: 'Transações importadas', description: `${records.length.toLocaleString()} linhas processadas (deduplicadas) no Neon.` });
+    } catch (error) {
+      console.error('Erro ao importar transações para Neon:', error);
+      toast({ title: 'Erro ao salvar Transações', description: 'Erro ao conectar com o banco Neon.' });
     }
-
-    await refresh();
-    toast({ title: 'Transações importadas', description: `${records.length.toLocaleString()} linhas processadas (deduplicadas).` });
   };
+
   const importPayments = async (file: File) => {
     const rows = await parsePaymentsFile(file);
     const payload = rows.map((r) => ({
@@ -253,28 +259,54 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toast({ title: 'Nenhum pagamento encontrado', description: 'Verifique a planilha (abas e colunas: afiliado, data, valor, status, método).' });
     }
 
-    // Dedup e envio em lotes para evitar timeout
+    // Dedup e envio em lotes para evitar timeout no banco Neon
     const byKey = new Map<string, typeof payload[number]>();
     for (const p of payload) if (!byKey.has(p.natural_key)) byKey.set(p.natural_key, p);
     const records = Array.from(byKey.values());
 
-    const CHUNK = 1000;
-    for (let i = 0; i < records.length; i += CHUNK) {
-      const chunk = records.slice(i, i + CHUNK);
-      const { error } = await supabase
-        .from('payments')
-        .upsert(chunk, { onConflict: 'natural_key', ignoreDuplicates: true });
-      if (error) {
-        toast({ title: 'Erro ao salvar Pagamentos', description: error.message });
-        return;
+    try {
+      const client = await getNeonClient();
+      const CHUNK = 1000;
+      for (let i = 0; i < records.length; i += CHUNK) {
+        const chunk = records.slice(i, i + CHUNK);
+        
+        // Usar INSERT ... ON CONFLICT para upsert no Neon
+        const values = chunk.map((_, index) => {
+          const baseIndex = index * 9;
+          return `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7}, $${baseIndex + 8}, $${baseIndex + 9})`;
+        }).join(', ');
+        
+        const params = chunk.flatMap(record => [
+          record.natural_key, record.clientes_id, record.afiliados_id, record.date,
+          record.value, record.method, record.status, record.classification, record.level
+        ]);
+        
+        const query = `
+          INSERT INTO payments (natural_key, clientes_id, afiliados_id, date, value, method, status, classification, level)
+          VALUES ${values}
+          ON CONFLICT (natural_key) DO UPDATE SET
+            clientes_id = EXCLUDED.clientes_id,
+            afiliados_id = EXCLUDED.afiliados_id,
+            date = EXCLUDED.date,
+            value = EXCLUDED.value,
+            method = EXCLUDED.method,
+            status = EXCLUDED.status,
+            classification = EXCLUDED.classification,
+            level = EXCLUDED.level
+        `;
+        
+        await client.query(query, params);
       }
+      
+      await refresh();
+      toast({ title: 'Pagamentos importados', description: `${records.length.toLocaleString()} linhas processadas (deduplicadas) no Neon.` });
+    } catch (error) {
+      console.error('Erro ao importar pagamentos para Neon:', error);
+      toast({ title: 'Erro ao salvar Pagamentos', description: 'Erro ao conectar com o banco Neon.' });
     }
-
-    await refresh();
-    toast({ title: 'Pagamentos importados', description: `${records.length.toLocaleString()} linhas processadas (deduplicadas).` });
   };
   React.useEffect(() => {
-    // Carrega dados do Supabase ao iniciar
+    // Carrega dados do Neon ao iniciar
     refresh();
   }, [refresh]);
 
@@ -289,12 +321,15 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     void (async () => {
       setTransactions(null);
       setPayments(null);
-      const { error } = await supabase.rpc('admin_reset_data');
-      if (error) {
-        toast({ title: 'Erro ao limpar dados', description: error.message });
-      } else {
+      try {
+        const client = await getNeonClient();
+        await client.query('TRUNCATE TABLE transactions RESTART IDENTITY');
+        await client.query('TRUNCATE TABLE payments RESTART IDENTITY');
         await refresh();
-        toast({ title: 'Dados limpos', description: 'As tabelas foram esvaziadas.' });
+        toast({ title: 'Dados limpos', description: 'As tabelas foram esvaziadas no Neon.' });
+      } catch (error) {
+        console.error('Erro ao limpar dados no Neon:', error);
+        toast({ title: 'Erro ao limpar dados', description: 'Erro ao conectar com o banco Neon.' });
       }
     })();
   };
