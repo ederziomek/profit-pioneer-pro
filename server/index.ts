@@ -160,10 +160,10 @@ const createTablesIfNotExist = async () => {
 
 // Função para processar arquivo de transações
 const parseTransactionsFile = (buffer: Buffer) => {
-  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true, raw: false });
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+  const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: 'dd/mm/yyyy' });
   
   if (data.length === 0) return [];
   
@@ -215,16 +215,62 @@ const parseTransactionsFile = (buffer: Buffer) => {
     
     return {
       customer_id: String(row[customerIdIndex]),
-      date: new Date(row[dateIndex] instanceof Date ? row[dateIndex] : new Date(row[dateIndex])),
-      ggr: Number(row[ggrIndex]) || 0,
-      chargeback: Number(row[chargebackIndex]) || 0,
-      deposit: Number(row[depositIndex]) || 0,
-      withdrawal: Number(row[withdrawalIndex]) || 0,
+      date: parseDate(row[dateIndex]),
+      ggr: parseFloat(row[ggrIndex]) || 0,
+      chargeback: parseFloat(row[chargebackIndex]) || 0,
+      deposit: parseFloat(row[depositIndex]) || 0,
+      withdrawal: parseFloat(row[withdrawalIndex]) || 0,
     };
   }).filter((t) => t.customer_id && !isNaN(t.date.getTime()));
   
   console.log(`🎯 Processamento concluído: ${results.length.toLocaleString()} registros válidos`);
   return results;
+};
+
+// Função para processar datas corretamente
+const parseDate = (value: any): Date => {
+  if (value instanceof Date) {
+    return value;
+  }
+  
+  if (typeof value === 'number') {
+    // Número serial do Excel
+    const excelEpoch = new Date(1900, 0, 1);
+    const days = value - 2; // Ajuste para diferença do Excel
+    return new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000);
+  }
+  
+  if (typeof value === 'string') {
+    // Tentar diferentes formatos de data
+    const formats = [
+      /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, // dd/mm/yyyy
+      /^(\d{4})-(\d{1,2})-(\d{1,2})$/, // yyyy-mm-dd
+    ];
+    
+    for (const format of formats) {
+      const match = value.match(format);
+      if (match) {
+        if (format === formats[0]) {
+          // dd/mm/yyyy
+          const [, day, month, year] = match;
+          return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        } else {
+          // yyyy-mm-dd
+          const [, year, month, day] = match;
+          return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        }
+      }
+    }
+    
+    // Fallback para Date constructor
+    const parsed = new Date(value);
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  
+  // Se nada funcionar, retornar data inválida
+  return new Date(NaN);
 };
 
 // Função para processar arquivo de pagamentos
@@ -289,12 +335,12 @@ const parsePaymentsFile = (buffer: Buffer) => {
     return {
       clientes_id: row[clientesIdIndex] ? String(row[clientesIdIndex]) : null,
       afiliados_id: String(row[afiliadosIdIndex]),
-      date: new Date(row[dateIndex] instanceof Date ? row[dateIndex] : new Date(row[dateIndex])),
-      value: Number(row[valueIndex]) || 0,
+      date: parseDate(row[dateIndex]),
+      value: parseFloat(row[valueIndex]) || 0,
       method: String(row[methodIndex]) || 'cpa',
       status: String(row[statusIndex]) || 'finish',
       classification: String(row[classificationIndex]) || 'normal',
-      level: Number(row[levelIndex]) || 1,
+      level: parseInt(row[levelIndex]) || 1,
     };
   }).filter((p) => !!p.afiliados_id && !isNaN(p.date.getTime()));
   
