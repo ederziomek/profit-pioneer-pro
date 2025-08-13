@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import DataUploader from "@/components/import/DataUploader";
-import { supabase } from "@/integrations/supabase/client";
+import { getNeonClient } from "@/integrations/neon/client";
 import { startOfWeek, format } from "date-fns";
 import { useAnalytics } from "@/context/AnalyticsContext";
 
@@ -20,25 +20,40 @@ const Database: React.FC = () => {
   const fetchMeta = React.useCallback(async () => {
     setLoading(true);
     try {
+      const client = await getNeonClient();
+      
+      // Contar transações e pagamentos
       const [txHead, pyHead] = await Promise.all([
-        supabase.from('transactions').select('*', { count: 'exact', head: true }),
-        supabase.from('payments').select('*', { count: 'exact', head: true }),
+        client.query('SELECT COUNT(*) as count FROM transactions'),
+        client.query('SELECT COUNT(*) as count FROM payments'),
       ]);
-      setTxCount(txHead.count ?? 0);
-      setPyCount(pyHead.count ?? 0);
+      
+      setTxCount(parseInt(txHead.rows[0].count));
+      setPyCount(parseInt(pyHead.rows[0].count));
 
+      // Buscar semanas com dados
       const [txWeeksRes, pyWeeksRes] = await Promise.all([
-        supabase.rpc('list_weeks_transactions'),
-        supabase.rpc('list_weeks_payments'),
+        client.query(`
+          SELECT DISTINCT (date_trunc('week', date AT TIME ZONE 'America/Sao_Paulo'))::date AS week_start
+          FROM transactions
+          ORDER BY week_start
+        `),
+        client.query(`
+          SELECT DISTINCT (date_trunc('week', date AT TIME ZONE 'America/Sao_Paulo'))::date AS week_start
+          FROM payments
+          ORDER BY week_start
+        `),
       ]);
 
-      const mapWeeks = (rows?: { week_start: string | Date }[]) => {
-        if (!rows) return [] as string[];
-        return rows.map((r) => format(new Date(r.week_start as any), 'dd/MM'));
+      const mapWeeks = (rows: any[]) => {
+        if (!rows || rows.length === 0) return [] as string[];
+        return rows.map((r) => format(new Date(r.week_start), 'dd/MM'));
       };
 
-      setTxWeeks(mapWeeks(txWeeksRes.data as any));
-      setPyWeeks(mapWeeks(pyWeeksRes.data as any));
+      setTxWeeks(mapWeeks(txWeeksRes.rows));
+      setPyWeeks(mapWeeks(pyWeeksRes.rows));
+    } catch (error) {
+      console.error('Erro ao buscar metadados:', error);
     } finally {
       setLoading(false);
     }

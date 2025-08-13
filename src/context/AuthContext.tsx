@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+
+interface User {
+  id: string;
+  email: string;
+  role: "admin" | "user";
+}
+
+interface Session {
+  user: User;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -19,55 +27,87 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session ?? null);
-      setUser(session?.user ?? null);
-    });
-
-    // THEN fetch current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session ?? null);
-      setUser(session?.user ?? null);
+    // Simular carregamento inicial
+    setTimeout(() => {
       setLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    }, 1000);
   }, []);
 
   const signIn: AuthContextType["signIn"] = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
-    return {};
+    // Mock de autenticação - aceita qualquer email/senha
+    if (email && password) {
+      const mockUser: User = {
+        id: "mock-user-id",
+        email: email,
+        role: email.includes("admin") ? "admin" : "user"
+      };
+      
+      const mockSession: Session = {
+        user: mockUser
+      };
+      
+      setUser(mockUser);
+      setSession(mockSession);
+      
+      // Salvar no localStorage para persistir
+      localStorage.setItem("mock-user", JSON.stringify(mockUser));
+      localStorage.setItem("mock-session", JSON.stringify(mockSession));
+      
+      return {};
+    }
+    
+    return { error: "Email e senha são obrigatórios" };
   };
 
   const signUp: AuthContextType["signUp"] = async (email, password, role = "user") => {
-    const redirectUrl = `${window.location.origin}/`;
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: redirectUrl },
-    });
-    if (error) return { error: error.message };
-
-    // If session exists immediately, insert profile row. Otherwise, user needs email confirmation.
-    const createdUser = data.user ?? null;
-    const hasSession = !!data.session;
-
-    if (createdUser && hasSession) {
-      // Insert profile with selected role on first sign-up (RLS allows inserting own profile)
-      await supabase.from("profiles").insert({ id: createdUser.id, role });
+    // Mock de cadastro
+    if (email && password) {
+      const mockUser: User = {
+        id: "mock-user-" + Date.now(),
+        email: email,
+        role: role
+      };
+      
+      const mockSession: Session = {
+        user: mockUser
+      };
+      
+      setUser(mockUser);
+      setSession(mockSession);
+      
+      // Salvar no localStorage
+      localStorage.setItem("mock-user", JSON.stringify(mockUser));
+      localStorage.setItem("mock-session", JSON.stringify(mockSession));
+      
       return {};
     }
-
-    return { needsConfirmation: true };
+    
+    return { error: "Email e senha são obrigatórios" };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    localStorage.removeItem("mock-user");
+    localStorage.removeItem("mock-session");
   };
+
+  // Verificar se há usuário salvo no localStorage
+  useEffect(() => {
+    const savedUser = localStorage.getItem("mock-user");
+    const savedSession = localStorage.getItem("mock-session");
+    
+    if (savedUser && savedSession) {
+      try {
+        const user = JSON.parse(savedUser);
+        const session = JSON.parse(savedSession);
+        setUser(user);
+        setSession(session);
+      } catch (error) {
+        console.error("Erro ao carregar usuário salvo:", error);
+      }
+    }
+  }, []);
 
   const value = useMemo<AuthContextType>(() => ({ user, session, loading, signIn, signUp, signOut }), [user, session, loading]);
 

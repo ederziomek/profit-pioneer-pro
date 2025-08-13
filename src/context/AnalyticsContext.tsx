@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
 import type { Payment, Transaction, CohortSummary, AffiliateSummary, Dataset } from "@/types/analytics";
 import { parsePaymentsFile, parseTransactionsFile, computeAll } from "@/lib/analytics";
-import { supabase } from "@/integrations/supabase/client";
-import { fetchAllData, fetchPaginatedData, executeNeonRPC, getNeonClient } from "@/integrations/neon/client-frontend";
+import { getNeonClient } from "@/integrations/neon/client";
 import { toast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 
@@ -17,7 +16,6 @@ interface AnalyticsContextType {
     roi: number;
   } | null;
   suspicious: AffiliateSummary[];
-  // Novas funções para paginação
   getPaginatedTransactions: (page: number, pageSize: number) => Promise<{ data: Transaction[]; total: number }>;
   getPaginatedPayments: (page: number, pageSize: number) => Promise<{ data: Payment[]; total: number }>;
   getPaginatedAffiliates: (page: number, pageSize: number, dateRange?: { start: Date; end: Date }) => Promise<{ data: any[]; total: number }>;
@@ -43,12 +41,20 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return computeAll(dataset);
   }, [dataset]);
 
-  // Função para buscar transações paginadas do Neon
   const getPaginatedTransactions = React.useCallback(async (page: number, pageSize: number) => {
     try {
-      const { data, total } = await fetchPaginatedData<any>('transactions', page, pageSize, 'date', 'DESC');
+      const client = await getNeonClient();
       
-      const formattedData = data.map((t: any) => ({
+      const countResult = await client.query('SELECT COUNT(*) FROM transactions');
+      const total = parseInt(countResult.rows[0].count);
+      
+      const offset = (page - 1) * pageSize;
+      const dataResult = await client.query(
+        'SELECT * FROM transactions ORDER BY date DESC LIMIT $1 OFFSET $2',
+        [pageSize, offset]
+      );
+      
+      const formattedData = dataResult.rows.map((t: any) => ({
         customer_id: t.customer_id,
         date: new Date(t.date),
         ggr: Number(t.ggr),
@@ -64,12 +70,20 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
-  // Função para buscar pagamentos paginados do Neon
   const getPaginatedPayments = React.useCallback(async (page: number, pageSize: number) => {
     try {
-      const { data, total } = await fetchPaginatedData<any>('payments', page, pageSize, 'date', 'DESC');
+      const client = await getNeonClient();
       
-      const formattedData = data.map((p: any) => ({
+      const countResult = await client.query('SELECT COUNT(*) FROM payments');
+      const total = parseInt(countResult.rows[0].count);
+      
+      const offset = (page - 1) * pageSize;
+      const dataResult = await client.query(
+        'SELECT * FROM payments ORDER BY date DESC LIMIT $1 OFFSET $2',
+        [pageSize, offset]
+      );
+      
+      const formattedData = dataResult.rows.map((p: any) => ({
         clientes_id: p.clientes_id,
         afiliados_id: p.afiliados_id,
         date: new Date(p.date),
@@ -87,35 +101,74 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
-  // Função para buscar afiliados paginados do Neon (usando RPC)
   const getPaginatedAffiliates = React.useCallback(async (page: number, pageSize: number, dateRange?: { start: Date; end: Date }) => {
     try {
-      const data = await executeNeonRPC<any>('get_affiliates_paginated', {
-        _page: page,
-        _page_size: pageSize,
-        _start_date: dateRange?.start?.toISOString() || null,
-        _end_date: dateRange?.end?.toISOString() || null
-      });
-
-      if (!data || data.length === 0) {
+      const client = await getNeonClient();
+      
+      let query = `
+        SELECT 
+          p.afiliados_id,
+          COUNT(DISTINCT p.clientes_id) FILTER (WHERE p.clientes_id IS NOT NULL) as customers,
+          SUM(p.value) FILTER (WHERE p.method = 'cpa' AND p.status = 'finish') as cpa_pago,
+          SUM(p.value) FILTER (WHERE p.method = 'rev' AND p.status = 'finish') as rev_pago,
+          SUM(p.value) FILTER (WHERE p.status = 'finish') as total_recebido,
+          COUNT(*) as total_count
+        FROM payments p
+      `;
+      
+      const params: any[] = [];
+      if (dateRange) {
+        query += ' WHERE p.date BETWEEN $1 AND $2';
+        params.push(dateRange.start.toISOString(), dateRange.end.toISOString());
+      }
+      
+      query += `
+        GROUP BY p.afiliados_id
+        ORDER BY total_recebido DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `;
+      
+      params.push(pageSize, (page - 1) * pageSize);
+      
+      const result = await client.query(query, params);
+      
+      if (!result.rows || result.rows.length === 0) {
         return { data: [], total: 0 };
       }
 
-      // Extrair o total_count do primeiro resultado (todos têm o mesmo valor)
-      const totalCount = data[0]?.total_count || 0;
+      let countQuery = 'SELECT COUNT(DISTINCT afiliados_id) FROM payments';
+      if (dateRange) {
+        countQuery += ' WHERE date BETWEEN $1 AND $2';
+        const countResult = await client.query(countQuery, [dateRange.start.toISOString(), dateRange.end.toISOString()]);
+        const totalCount = parseInt(countResult.rows[0].count);
+        
+        const formattedData = result.rows.map((item: any) => ({
+          afiliados_id: item.afiliados_id,
+          customers: Number(item.customers),
+          ngr_total: 0,
+          cpa_pago: Number(item.cpa_pago),
+          rev_pago: Number(item.rev_pago),
+          total_recebido: Number(item.total_recebido),
+          roi: item.total_recebido > 0 ? (Number(item.rev_pago) / Number(item.cpa_pago)) : null
+        }));
 
-      // Formatar os dados removendo o campo total_count
-      const formattedData = data.map((item: any) => ({
-        afiliados_id: item.afiliados_id,
-        customers: Number(item.customers),
-        ngr_total: Number(item.ngr_total),
-        cpa_pago: Number(item.cpa_pago),
-        rev_pago: Number(item.rev_pago),
-        total_recebido: Number(item.total_recebido),
-        roi: item.roi ? Number(item.roi) : null
-      }));
+        return { data: formattedData, total: totalCount };
+      } else {
+        const countResult = await client.query(countQuery);
+        const totalCount = parseInt(countResult.rows[0].count);
+        
+        const formattedData = result.rows.map((item: any) => ({
+          afiliados_id: item.afiliados_id,
+          customers: Number(item.customers),
+          ngr_total: 0,
+          cpa_pago: Number(item.cpa_pago),
+          rev_pago: Number(item.rev_pago),
+          total_recebido: Number(item.total_recebido),
+          roi: item.total_recebido > 0 ? (Number(item.rev_pago) / Number(item.cpa_pago)) : null
+        }));
 
-      return { data: formattedData, total: totalCount };
+        return { data: formattedData, total: totalCount };
+      }
     } catch (error) {
       console.error('Erro ao buscar afiliados paginados do Neon:', error);
       return { data: [], total: 0 };
@@ -124,20 +177,21 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const refresh = React.useCallback(async () => {
     try {
-      console.log('🔄 Carregando dados do Neon...');
+      console.log('Carregando dados do Neon...');
       
-      // Carregar TODOS os dados do Neon para o dashboard
+      const client = await getNeonClient();
+      
       const [txData, pyData] = await Promise.all([
-        fetchAllData<any>('transactions'),
-        fetchAllData<any>('payments'),
+        client.query('SELECT * FROM transactions ORDER BY date DESC'),
+        client.query('SELECT * FROM payments ORDER BY date DESC'),
       ]);
 
-      console.log(`📊 Transações carregadas: ${txData.length}`);
-      console.log(`📊 Pagamentos carregados: ${pyData.length}`);
+      console.log(`Transações carregadas: ${txData.rows.length}`);
+      console.log(`Pagamentos carregados: ${pyData.rows.length}`);
 
-      if (txData?.length) {
+      if (txData?.rows?.length) {
         setTransactions(
-          txData.map((t: any) => ({
+          txData.rows.map((t: any) => ({
             customer_id: t.customer_id,
             date: new Date(t.date),
             ggr: Number(t.ggr),
@@ -148,9 +202,9 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         );
       }
       
-      if (pyData?.length) {
+      if (pyData?.rows?.length) {
         setPayments(
-          pyData.map((p: any) => ({
+          pyData.rows.map((p: any) => ({
             clientes_id: p.clientes_id,
             afiliados_id: p.afiliados_id,
             date: new Date(p.date),
@@ -163,15 +217,16 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         );
       }
 
-      console.log('✅ Dados carregados com sucesso do Neon!');
+      console.log('Dados carregados com sucesso do Neon!');
     } catch (error) {
-      console.error('💥 Erro ao carregar dados do Neon:', error);
+      console.error('Erro ao carregar dados do Neon:', error);
       toast({ 
         title: 'Erro ao carregar dados', 
         description: 'Não foi possível conectar ao banco Neon. Verifique a conexão.' 
       });
     }
   }, []);
+
   const importTransactions = async (file: File) => {
     const rows = await parseTransactionsFile(file);
     const payload = rows.map((r) => ({
@@ -192,7 +247,6 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toast({ title: 'Nenhuma transação encontrada', description: 'Verifique a planilha (abas e colunas).' });
     }
 
-    // Dedup e envio em lotes para evitar timeout no banco Neon
     const byKey = new Map<string, typeof payload[number]>();
     for (const p of payload) if (!byKey.has(p.natural_key)) byKey.set(p.natural_key, p);
     const records = Array.from(byKey.values());
@@ -203,7 +257,6 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       for (let i = 0; i < records.length; i += CHUNK) {
         const chunk = records.slice(i, i + CHUNK);
         
-        // Usar INSERT ... ON CONFLICT para upsert no Neon
         const values = chunk.map((_, index) => {
           const baseIndex = index * 6;
           return `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6})`;
@@ -259,7 +312,6 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toast({ title: 'Nenhum pagamento encontrado', description: 'Verifique a planilha (abas e colunas: afiliado, data, valor, status, método).' });
     }
 
-    // Dedup e envio em lotes para evitar timeout no banco Neon
     const byKey = new Map<string, typeof payload[number]>();
     for (const p of payload) if (!byKey.has(p.natural_key)) byKey.set(p.natural_key, p);
     const records = Array.from(byKey.values());
@@ -270,7 +322,6 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       for (let i = 0; i < records.length; i += CHUNK) {
         const chunk = records.slice(i, i + CHUNK);
         
-        // Usar INSERT ... ON CONFLICT para upsert no Neon
         const values = chunk.map((_, index) => {
           const baseIndex = index * 9;
           return `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5}, $${baseIndex + 6}, $${baseIndex + 7}, $${baseIndex + 8}, $${baseIndex + 9})`;
@@ -305,63 +356,43 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toast({ title: 'Erro ao salvar Pagamentos', description: 'Erro ao conectar com o banco Neon.' });
     }
   };
-  React.useEffect(() => {
-    // Carrega dados do Neon ao iniciar
-    refresh();
-  }, [refresh]);
 
-  React.useEffect(() => {
-    // Recarrega quando o usuário autentica (evita dataset vazio ao abrir /auth)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (session) void refresh();
-    });
-    return () => subscription.unsubscribe();
-  }, [refresh]);
   const reset = () => {
     void (async () => {
       setTransactions(null);
       setPayments(null);
       try {
-        console.log('🔄 Iniciando limpeza do banco de dados...');
+        console.log('Iniciando limpeza do banco de dados...');
         
-        // Limpar transações
-        const { error: txError, count: txCount } = await supabase
-          .from('transactions')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
+        const client = await getNeonClient();
         
-        if (txError) {
-          console.error('Erro ao limpar transações:', txError);
-          throw new Error(`Erro ao limpar transações: ${txError.message}`);
-        }
+        const txResult = await client.query('DELETE FROM transactions');
+        console.log(`Transacoes removidas: ${txResult.rowCount}`);
         
-        // Limpar pagamentos
-        const { error: pyError, count: pyCount } = await supabase
-          .from('payments')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
+        const pyResult = await client.query('DELETE FROM payments');
+        console.log(`Pagamentos removidos: ${pyResult.rowCount}`);
         
-        if (pyError) {
-          console.error('Erro ao limpar pagamentos:', pyError);
-          throw new Error(`Erro ao limpar pagamentos: ${pyError.message}`);
-        }
-        
-        console.log(`✅ Limpeza concluída: ${txCount || 0} transações e ${pyCount || 0} pagamentos removidos`);
+        console.log(`Limpeza concluida: ${txResult.rowCount} transacoes e ${pyResult.rowCount} pagamentos removidos`);
         
         await refresh();
         toast({ 
           title: 'Dados limpos com sucesso!', 
-          description: `Banco de dados zerado. ${txCount || 0} transações e ${pyCount || 0} pagamentos removidos.` 
+          description: `Banco de dados zerado. ${txResult.rowCount} transacoes e ${pyResult.rowCount} pagamentos removidos.` 
         });
       } catch (error) {
         console.error('Erro ao limpar dados:', error);
         toast({ 
           title: 'Erro ao limpar dados', 
-          description: error instanceof Error ? error.message : 'Erro desconhecido ao conectar com o banco.' 
+          description: error instanceof Error ? error.message : 'Erro desconhecido ao conectar com o banco Neon.' 
         });
       }
     })();
   };
+
+  React.useEffect(() => {
+    refresh();
+  }, [refresh]);
+
   return (
     <AnalyticsContext.Provider value={{ dataset, cohorts, affiliates, totals, suspicious, getPaginatedTransactions, getPaginatedPayments, getPaginatedAffiliates, importTransactions, importPayments, reset, refresh }}>
       {children}

@@ -75,7 +75,7 @@ const Auth: React.FC = () => {
               <div className="flex gap-2">
                 <Button type="button" variant="secondary" onClick={() => { setEmail("admin@exemplo.com"); setPassword("senha123!"); setMode("signup"); }}>Preencher admin</Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">Dica: Desative a confirmação de e-mail no Supabase durante testes, ou verifique seu e-mail para concluir o cadastro.</p>
+              <p className="text-xs text-muted-foreground mt-2">Dica: Verifique seu e-mail para concluir o cadastro.</p>
             </div>
           </form>
         </CardContent>
