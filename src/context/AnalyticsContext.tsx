@@ -322,14 +322,43 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setTransactions(null);
       setPayments(null);
       try {
-        const client = await getNeonClient();
-        await client.query('TRUNCATE TABLE transactions RESTART IDENTITY');
-        await client.query('TRUNCATE TABLE payments RESTART IDENTITY');
+        console.log('🔄 Iniciando limpeza do banco de dados...');
+        
+        // Limpar transações
+        const { error: txError, count: txCount } = await supabase
+          .from('transactions')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        
+        if (txError) {
+          console.error('Erro ao limpar transações:', txError);
+          throw new Error(`Erro ao limpar transações: ${txError.message}`);
+        }
+        
+        // Limpar pagamentos
+        const { error: pyError, count: pyCount } = await supabase
+          .from('payments')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        
+        if (pyError) {
+          console.error('Erro ao limpar pagamentos:', pyError);
+          throw new Error(`Erro ao limpar pagamentos: ${pyError.message}`);
+        }
+        
+        console.log(`✅ Limpeza concluída: ${txCount || 0} transações e ${pyCount || 0} pagamentos removidos`);
+        
         await refresh();
-        toast({ title: 'Dados limpos', description: 'As tabelas foram esvaziadas no Neon.' });
+        toast({ 
+          title: 'Dados limpos com sucesso!', 
+          description: `Banco de dados zerado. ${txCount || 0} transações e ${pyCount || 0} pagamentos removidos.` 
+        });
       } catch (error) {
-        console.error('Erro ao limpar dados no Neon:', error);
-        toast({ title: 'Erro ao limpar dados', description: 'Erro ao conectar com o banco Neon.' });
+        console.error('Erro ao limpar dados:', error);
+        toast({ 
+          title: 'Erro ao limpar dados', 
+          description: error instanceof Error ? error.message : 'Erro desconhecido ao conectar com o banco.' 
+        });
       }
     })();
   };
