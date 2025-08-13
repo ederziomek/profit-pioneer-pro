@@ -12,6 +12,7 @@ import Fraud from "@/pages/Fraud";
 import Database from "@/pages/Database";
 import { AnalyticsProvider } from "@/context/AnalyticsContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import RequireAuth from "@/components/RequireAuth";
 import Auth from "@/pages/Auth";
 const queryClient = new QueryClient();
@@ -22,24 +23,26 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
-          <AnalyticsProvider>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route element={<RequireAuth />}>
-                <Route element={<AppLayout />}>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/cohorts" element={<Cohorts />} />
-                  <Route path="/afiliados" element={<Affiliates />} />
-                  <Route path="/fraudes" element={<Fraud />} />
-                  <Route path="/database" element={<Database />} />
+        <ThemeProvider>
+          <AuthProvider>
+            <AnalyticsProvider>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route element={<RequireAuth />}>
+                  <Route element={<AppLayout />}>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/cohorts" element={<Cohorts />} />
+                    <Route path="/afiliados" element={<Affiliates />} />
+                    <Route path="/fraudes" element={<Fraud />} />
+                    <Route path="/database" element={<Database />} />
+                  </Route>
                 </Route>
-              </Route>
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AnalyticsProvider>
-        </AuthProvider>
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AnalyticsProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
