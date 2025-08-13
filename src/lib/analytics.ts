@@ -42,11 +42,33 @@ const parseDate = (v: any): Date => {
     return new Date(v);
   }
   if (typeof v === "string") {
-    const d = new Date(v);
+    const s = v.trim();
+    if (!s) return new Date(NaN);
+    // Prefer Brazilian formats first (dd/MM/yyyy) with optional time
+    const patterns = [
+      "d/M/yyyy H:m:s",
+      "d/M/yyyy H:m",
+      "d/M/yyyy",
+      "dd/MM/yyyy HH:mm:ss",
+      "dd/MM/yyyy HH:mm",
+      "dd/MM/yyyy",
+      // ISO and common safe formats
+      "yyyy-MM-dd'T'HH:mm:ssXXX",
+      "yyyy-MM-dd HH:mm:ss",
+      "yyyy-MM-dd",
+      // Fallback US format only if needed
+      "MM/dd/yyyy",
+    ];
+    for (const p of patterns) {
+      try {
+        const d = parse(s, p as any, new Date());
+        if (!isNaN(d.getTime())) return d;
+      } catch {}
+    }
+    const d = new Date(s);
     if (!isNaN(d.getTime())) return d;
-    try { return parse(v, "dd/MM/yyyy", new Date()); } catch { return new Date(v); }
   }
-  return new Date();
+  return new Date(NaN);
 };
 
 export async function parseTransactionsFile(file: File): Promise<Transaction[]> {

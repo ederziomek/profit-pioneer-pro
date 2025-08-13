@@ -3,6 +3,7 @@ import type { Payment, Transaction, CohortSummary, AffiliateSummary, Dataset } f
 import { parsePaymentsFile, parseTransactionsFile, computeAll } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import { format } from "date-fns";
 interface AnalyticsContextType {
   dataset: Dataset | null;
   cohorts: CohortSummary[];
@@ -74,6 +75,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const importTransactions = async (file: File) => {
     const rows = await parseTransactionsFile(file);
     const payload = rows.map((r) => ({
+      natural_key: `${r.customer_id}|${format(r.date, 'yyyy-MM-dd')}`,
       customer_id: r.customer_id,
       date: r.date.toISOString(),
       ggr: r.ggr,
@@ -97,6 +99,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const importPayments = async (file: File) => {
     const rows = await parsePaymentsFile(file);
     const payload = rows.map((r) => ({
+      natural_key: `${r.afiliados_id}|${(r.clientes_id ?? 'null')}|${format(r.date, 'yyyy-MM-dd')}|${r.method}|${r.value}`,
       clientes_id: r.clientes_id,
       afiliados_id: r.afiliados_id,
       date: r.date.toISOString(),
