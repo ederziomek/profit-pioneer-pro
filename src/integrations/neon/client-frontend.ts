@@ -1,40 +1,44 @@
-// Cliente Neon para frontend - processa dados localmente
+// Cliente Neon para frontend - usa API real para conectar com o banco Neon
 // Este arquivo é específico para o frontend e não depende de módulos Node.js
 
-// Armazenamento local temporário para demonstração
-let localTransactions: any[] = [];
-let localPayments: any[] = [];
+const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
-// Função para executar queries diretas (usada no Database.tsx)
+// Função para executar queries diretas via API
 export const executeDirectQuery = async (query: string) => {
   try {
     if (query.includes('COUNT(*) FROM transactions')) {
-      return { rows: [{ count: localTransactions.length.toString() }] };
+      const response = await fetch(`${API_BASE_URL}/api/counts`);
+      const data = await response.json();
+      return { rows: [{ count: data.transactions.toString() }] };
     }
     
     if (query.includes('COUNT(*) FROM payments')) {
-      return { rows: [{ count: localPayments.length.toString() }] };
+      const response = await fetch(`${API_BASE_URL}/api/counts`);
+      const data = await response.json();
+      return { rows: [{ count: data.payments.toString() }] };
     }
     
     if (query.includes('SELECT * FROM transactions')) {
-      return { rows: localTransactions };
+      const response = await fetch(`${API_BASE_URL}/api/transactions`);
+      const data = await response.json();
+      return { rows: data };
     }
     
     if (query.includes('SELECT * FROM payments')) {
-      return { rows: localPayments };
+      const response = await fetch(`${API_BASE_URL}/api/payments`);
+      const data = await response.json();
+      return { rows: data };
     }
     
     if (query.includes('date_trunc')) {
-      // Para queries de semanas
-      const table = query.includes('transactions') ? localTransactions : localPayments;
-      const weeks = [...new Set(table.map(row => {
-        const date = new Date(row.date);
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - date.getDay());
-        return weekStart.toISOString().split('T')[0];
-      }))].sort();
+      const response = await fetch(`${API_BASE_URL}/api/weeks`);
+      const data = await response.json();
       
-      return { rows: weeks.map(week => ({ week_start: week })) };
+      if (query.includes('transactions')) {
+        return { rows: data.transactions.map((week: string) => ({ week_start: week })) };
+      } else {
+        return { rows: data.payments.map((week: string) => ({ week_start: week })) };
+      }
     }
     
     console.log('Query não reconhecida:', query);
@@ -45,73 +49,101 @@ export const executeDirectQuery = async (query: string) => {
   }
 };
 
-// Função para executar queries com parâmetros
+// Função para executar queries com parâmetros via API
 export const executeQueryWithParams = async (query: string, params: any[]) => {
   try {
     if (query.includes('INSERT INTO transactions')) {
-      // Simular inserção de transações
-      const newTransactions = params.filter((_, i) => i % 6 === 0).map((_, index) => {
+      // Criar FormData para upload
+      const formData = new FormData();
+      
+      // Simular arquivo para a API
+      const csvContent = params.filter((_, i) => i % 6 === 0).map((_, index) => {
         const baseIndex = index * 6;
-        return {
-          natural_key: params[baseIndex],
-          customer_id: params[baseIndex + 1],
-          date: params[baseIndex + 2],
-          ggr: params[baseIndex + 3],
-          chargeback: params[baseIndex + 4],
-          deposit: params[baseIndex + 5],
-          withdrawal: params[baseIndex + 6],
-        };
+        return `${params[baseIndex + 1]},${params[baseIndex + 2]},${params[baseIndex + 3]},${params[baseIndex + 4]},${params[baseIndex + 5]},${params[baseIndex + 6]}`;
+      }).join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      formData.append('file', blob, 'transactions.csv');
+      
+      const response = await fetch(`${API_BASE_URL}/api/import/transactions`, {
+        method: 'POST',
+        body: formData,
       });
       
-      localTransactions = [...localTransactions, ...newTransactions];
-      return { rowCount: newTransactions.length };
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao importar transações');
+      }
+      
+      return { rowCount: result.count };
     }
     
     if (query.includes('INSERT INTO payments')) {
-      // Simular inserção de pagamentos
-      const newPayments = params.filter((_, i) => i % 9 === 0).map((_, index) => {
+      // Criar FormData para upload
+      const formData = new FormData();
+      
+      // Simular arquivo para a API
+      const csvContent = params.filter((_, i) => i % 9 === 0).map((_, index) => {
         const baseIndex = index * 9;
-        return {
-          natural_key: params[baseIndex],
-          clientes_id: params[baseIndex + 1],
-          afiliados_id: params[baseIndex + 2],
-          date: params[baseIndex + 3],
-          value: params[baseIndex + 4],
-          method: params[baseIndex + 5],
-          status: params[baseIndex + 6],
-          classification: params[baseIndex + 7],
-          level: params[baseIndex + 8],
-        };
+        return `${params[baseIndex + 1]},${params[baseIndex + 2]},${params[baseIndex + 3]},${params[baseIndex + 4]},${params[baseIndex + 5]},${params[baseIndex + 6]},${params[baseIndex + 7]},${params[baseIndex + 8]}`;
+      }).join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      formData.append('file', blob, 'payments.csv');
+      
+      const response = await fetch(`${API_BASE_URL}/api/import/payments`, {
+        method: 'POST',
+        body: formData,
       });
       
-      localPayments = [...localPayments, ...newPayments];
-      return { rowCount: newPayments.length };
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao importar pagamentos');
+      }
+      
+      return { rowCount: result.count };
     }
     
     if (query.includes('DELETE FROM transactions')) {
-      const count = localTransactions.length;
-      localTransactions = [];
-      return { rowCount: count };
+      const response = await fetch(`${API_BASE_URL}/api/reset`, {
+        method: 'POST',
+      });
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao resetar dados');
+      }
+      
+      return { rowCount: result.transactionsDeleted };
     }
     
     if (query.includes('DELETE FROM payments')) {
-      const count = localPayments.length;
-      localPayments = [];
-      return { rowCount: count };
+      const response = await fetch(`${API_BASE_URL}/api/reset`, {
+        method: 'POST',
+      });
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao resetar dados');
+      }
+      
+      return { rowCount: result.paymentsDeleted };
     }
     
     if (query.includes('SELECT * FROM transactions ORDER BY date DESC LIMIT')) {
       const limit = params[0];
       const offset = params[1];
-      const sorted = [...localTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      return { rows: sorted.slice(offset, offset + limit) };
+      const response = await fetch(`${API_BASE_URL}/api/transactions?limit=${limit}&offset=${offset}`);
+      const data = await response.json();
+      return { rows: data };
     }
     
     if (query.includes('SELECT * FROM payments ORDER BY date DESC LIMIT')) {
       const limit = params[0];
       const offset = params[1];
-      const sorted = [...localPayments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      return { rows: sorted.slice(offset, offset + limit) };
+      const response = await fetch(`${API_BASE_URL}/api/payments?limit=${limit}&offset=${offset}`);
+      const data = await response.json();
+      return { rows: data };
     }
     
     console.log('Query com parâmetros não reconhecida:', query, params);
