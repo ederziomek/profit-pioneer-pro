@@ -2,8 +2,8 @@
 builder = "nixpacks"
 
 [deploy]
-# FORÇAR NOVO DEPLOY - Servidor express-fixed.js para importação funcionando
-startCommand = "npm run build && node server/express-fixed.js"
+# FORÇAR NOVO DEPLOY - Servidor express-debug.js com logs detalhados para importação
+startCommand = "npm run build && node server/express-debug.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 60
 restartPolicyType = "on_failure"
