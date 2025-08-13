@@ -51,15 +51,6 @@ app.get('/health/simple', (req, res) => {
   res.status(200).send('OK');
 });
 
-// Rota raiz simples para compatibilidade
-app.get('/', (req, res) => {
-  res.status(200).json({ 
-    message: 'Profit Pioneer Pro API',
-    status: 'running',
-    timestamp: new Date().toISOString()
-  });
-});
-
 // Configuração do multer para upload de arquivos
 const upload = multer({ storage: multer.memoryStorage() });
 
