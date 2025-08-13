@@ -10,6 +10,7 @@
     "start": "tsx server/index.ts",
     "start:prod": "node dist-server/index.js",
     "build:server": "tsx --build server/index.ts",
+    "test:server": "node server/ultra-basic.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "api": "tsx server/api.ts"
