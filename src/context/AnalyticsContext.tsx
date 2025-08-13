@@ -4,6 +4,7 @@ import { parsePaymentsFile, parseTransactionsFile, computeAll } from "@/lib/anal
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
+
 interface AnalyticsContextType {
   dataset: Dataset | null;
   cohorts: CohortSummary[];
@@ -15,6 +16,10 @@ interface AnalyticsContextType {
     roi: number;
   } | null;
   suspicious: AffiliateSummary[];
+  // Novas funções para paginação
+  getPaginatedTransactions: (page: number, pageSize: number) => Promise<{ data: Transaction[]; total: number }>;
+  getPaginatedPayments: (page: number, pageSize: number) => Promise<{ data: Payment[]; total: number }>;
+  getPaginatedAffiliates: (page: number, pageSize: number, dateRange?: { start: Date; end: Date }) => Promise<{ data: any[]; total: number }>;
   importTransactions: (file: File) => Promise<void>;
   importPayments: (file: File) => Promise<void>;
   reset: () => void;
@@ -37,36 +42,126 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return computeAll(dataset);
   }, [dataset]);
 
-  const refresh = React.useCallback(async () => {
-    // Paginate to load ALL rows (PostgREST has default 1,000 row limit)
-    const PAGE = 1000;
+  // Função para buscar transações paginadas
+  const getPaginatedTransactions = React.useCallback(async (page: number, pageSize: number) => {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
 
-    const fetchAll = async (table: 'transactions' | 'payments') => {
-      const results: any[] = [];
-      let from = 0;
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const { data, error } = await supabase
-          .from(table)
-          .select('*')
-          .order('date', { ascending: true })
-          .range(from, from + PAGE - 1);
-        if (error) {
-          console.error(`Erro ao carregar ${table}:`, error);
-          break;
-        }
-        const len = data?.length ?? 0;
-        if (!len) break;
-        results.push(...(data as any[]));
-        if (len < PAGE) break;
-        from += PAGE;
+    const { data, error, count } = await supabase
+      .from('transactions')
+      .select('*', { count: 'exact' })
+      .order('date', { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      console.error('Erro ao carregar transações:', error);
+      return { data: [], total: 0 };
+    }
+
+    const formattedData = (data || []).map((t: any) => ({
+      customer_id: t.customer_id,
+      date: new Date(t.date),
+      ggr: Number(t.ggr),
+      chargeback: Number(t.chargeback),
+      deposit: Number(t.deposit),
+      withdrawal: Number(t.withdrawal),
+    }));
+
+    return { data: formattedData, total: count || 0 };
+  }, []);
+
+  // Função para buscar pagamentos paginados
+  const getPaginatedPayments = React.useCallback(async (page: number, pageSize: number) => {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const { data, error, count } = await supabase
+      .from('payments')
+      .select('*', { count: 'exact' })
+      .order('date', { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      console.error('Erro ao carregar pagamentos:', error);
+      return { data: [], total: 0 };
+    }
+
+    const formattedData = (data || []).map((p: any) => ({
+      clientes_id: p.clientes_id,
+      afiliados_id: p.afiliados_id,
+      date: new Date(p.date),
+      value: Number(p.value),
+      method: p.method,
+      status: p.status,
+      classification: p.classification,
+      level: Number(p.level),
+    }));
+
+    return { data: formattedData, total: count || 0 };
+  }, []);
+
+  // Função para buscar afiliados paginados com computação no backend
+  const getPaginatedAffiliates = React.useCallback(async (page: number, pageSize: number, dateRange?: { start: Date; end: Date }) => {
+    try {
+      const { data, error } = await supabase.rpc('get_affiliates_paginated', {
+        _page: page,
+        _page_size: pageSize,
+        _start_date: dateRange?.start?.toISOString() || null,
+        _end_date: dateRange?.end?.toISOString() || null
+      });
+
+      if (error) {
+        console.error('Erro ao carregar afiliados paginados:', error);
+        return { data: [], total: 0 };
       }
-      return results;
+
+      if (!data || data.length === 0) {
+        return { data: [], total: 0 };
+      }
+
+      // Extrair o total_count do primeiro resultado (todos têm o mesmo valor)
+      const totalCount = data[0]?.total_count || 0;
+
+      // Formatar os dados removendo o campo total_count
+      const formattedData = data.map((item: any) => ({
+        afiliados_id: item.afiliados_id,
+        customers: Number(item.customers),
+        ngr_total: Number(item.ngr_total),
+        cpa_pago: Number(item.cpa_pago),
+        rev_pago: Number(item.rev_pago),
+        total_recebido: Number(item.total_recebido),
+        roi: item.roi ? Number(item.roi) : null
+      }));
+
+      return { data: formattedData, total: totalCount };
+    } catch (error) {
+      console.error('Erro ao buscar afiliados paginados:', error);
+      return { data: [], total: 0 };
+    }
+  }, []);
+
+  const refresh = React.useCallback(async () => {
+    // Carregar apenas uma amostra para o contexto geral (para gráficos e totais)
+    const SAMPLE_SIZE = 1000;
+
+    const fetchSample = async (table: 'transactions' | 'payments') => {
+      const { data, error } = await supabase
+        .from(table)
+        .select('*')
+        .order('date', { ascending: false }) // Mais recentes primeiro
+        .limit(SAMPLE_SIZE);
+
+      if (error) {
+        console.error(`Erro ao carregar ${table}:`, error);
+        return [];
+      }
+
+      return data || [];
     };
 
     const [txData, pyData] = await Promise.all([
-      fetchAll('transactions'),
-      fetchAll('payments'),
+      fetchSample('transactions'),
+      fetchSample('payments'),
     ]);
 
     if (txData?.length) {
@@ -204,7 +299,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     })();
   };
   return (
-    <AnalyticsContext.Provider value={{ dataset, cohorts, affiliates, totals, suspicious, importTransactions, importPayments, reset, refresh }}>
+    <AnalyticsContext.Provider value={{ dataset, cohorts, affiliates, totals, suspicious, getPaginatedTransactions, getPaginatedPayments, getPaginatedAffiliates, importTransactions, importPayments, reset, refresh }}>
       {children}
     </AnalyticsContext.Provider>
   );
