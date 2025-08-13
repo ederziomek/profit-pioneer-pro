@@ -181,6 +181,14 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Carrega dados do Supabase ao iniciar
     refresh();
   }, [refresh]);
+
+  React.useEffect(() => {
+    // Recarrega quando o usuário autentica (evita dataset vazio ao abrir /auth)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session) void refresh();
+    });
+    return () => subscription.unsubscribe();
+  }, [refresh]);
   const reset = () => {
     void (async () => {
       setTransactions(null);
