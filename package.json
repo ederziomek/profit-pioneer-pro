@@ -8,6 +8,8 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "start": "tsx server/index.ts",
+    "start:prod": "node dist-server/index.js",
+    "build:server": "tsx --build server/index.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "api": "tsx server/api.ts"

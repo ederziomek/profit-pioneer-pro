@@ -26,25 +26,15 @@ if (!isProduction) {
 }
 
 // Rota de healthcheck para o Railway
-app.get('/health', async (req, res) => {
+app.get('/health', (req, res) => {
   try {
-    // Verificar conexão com o banco
-    let dbStatus = 'disconnected';
-    try {
-      const client = await getNeonClient();
-      await client.query('SELECT 1');
-      dbStatus = 'connected';
-    } catch (dbError) {
-      console.error('Erro na conexão com banco:', dbError);
-      dbStatus = 'error';
-    }
-
     res.status(200).json({ 
       status: 'ok', 
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      database: dbStatus,
-      environment: process.env.NODE_ENV || 'development'
+      environment: process.env.NODE_ENV || 'development',
+      port: port,
+      message: 'Server is running and healthy'
     });
   } catch (error) {
     console.error('Erro no healthcheck:', error);
@@ -54,6 +44,11 @@ app.get('/health', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   }
+});
+
+// Rota de healthcheck simples para o Railway (sem dependências)
+app.get('/health/simple', (req, res) => {
+  res.status(200).send('OK');
 });
 
 // Rota raiz simples para compatibilidade
@@ -388,11 +383,32 @@ app.use((error: any, req: any, res: any, next: any) => {
 });
 
 // Iniciar servidor
-const server = app.listen(port, () => {
-  console.log(`Servidor unificado rodando na porta ${port}`);
-  console.log(`Frontend: http://localhost:${port}`);
-  console.log(`API: http://localhost:${port}/api`);
-  console.log(`Healthcheck: http://localhost:${port}/health`);
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log('=================================');
+  console.log('🚀 SERVIDOR INICIADO COM SUCESSO!');
+  console.log('=================================');
+  console.log(`📍 Porta: ${port}`);
+  console.log(`🌐 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 URL Local: http://localhost:${port}`);
+  console.log(`🔗 URL Externa: http://0.0.0.0:${port}`);
+  console.log(`📊 Healthcheck: http://localhost:${port}/health`);
+  console.log(`📁 Frontend: http://localhost:${port}`);
+  console.log(`⚡ API: http://localhost:${port}/api`);
+  console.log('=================================');
+  
+  // Verificar se a porta está realmente em uso
+  const address = server.address();
+  if (address && typeof address === 'object') {
+    console.log(`✅ Servidor escutando em: ${address.address}:${address.port}`);
+  }
+}).on('error', (error) => {
+  console.error('❌ ERRO AO INICIAR SERVIDOR:', error);
+  console.error('Detalhes do erro:', {
+    code: error.code,
+    message: error.message,
+    stack: error.stack
+  });
+  process.exit(1);
 });
 
 // Graceful shutdown

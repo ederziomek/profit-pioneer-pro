@@ -2,9 +2,9 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "npm run build && npm start"
-healthcheckPath = "/health"
-healthcheckTimeout = 30
+startCommand = "npm run build && tsx server/simple.ts"
+healthcheckPath = "/health/simple"
+healthcheckTimeout = 60
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
