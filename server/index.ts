@@ -263,14 +263,28 @@ const parseTransactionsFile = (buffer: Buffer) => {
     // Tratar valores negativos (ex: "-R$ 300.32")
     const isNegative = value.includes('-') && !value.includes('R$ -');
     
-    // Remover caracteres não numéricos exceto vírgula e ponto
-    cleaned = cleaned.replace(/[^\d,.-]/g, '');
-    
-    // Converter vírgula decimal para ponto (formato brasileiro)
+    // Formato brasileiro: 1.234.567,89
+    // Remover pontos que são separadores de milhares (exceto o último ponto se não há vírgula)
     if (cleaned.includes(',')) {
-      // Se tem vírgula, assumir que é decimal brasileiro (ex: 14,97)
-      cleaned = cleaned.replace(',', '.');
+      // Se tem vírgula, os pontos são separadores de milhares
+      const parts = cleaned.split(',');
+      const integerPart = parts[0].replace(/\./g, ''); // Remove todos os pontos da parte inteira
+      const decimalPart = parts[1] || '0';
+      cleaned = integerPart + '.' + decimalPart;
+    } else if (cleaned.includes('.')) {
+      // Se não tem vírgula mas tem ponto, verificar se é decimal ou separador de milhares
+      const parts = cleaned.split('.');
+      if (parts.length === 2 && parts[1].length <= 2) {
+        // Provavelmente é decimal (ex: 1000.50)
+        cleaned = cleaned;
+      } else {
+        // Provavelmente são separadores de milhares (ex: 1.000.000)
+        cleaned = cleaned.replace(/\./g, '');
+      }
     }
+    
+    // Remover caracteres não numéricos exceto ponto decimal
+    cleaned = cleaned.replace(/[^\d.-]/g, '');
     
     const result = parseFloat(cleaned) || 0;
     return isNegative ? -result : result;
@@ -409,14 +423,28 @@ const parsePaymentsFile = (buffer: Buffer) => {
     // Tratar valores negativos (ex: "-R$ 300.32")
     const isNegative = value.includes('-') && !value.includes('R$ -');
     
-    // Remover caracteres não numéricos exceto vírgula e ponto
-    cleaned = cleaned.replace(/[^\d,.-]/g, '');
-    
-    // Converter vírgula decimal para ponto (formato brasileiro)
+    // Formato brasileiro: 1.234.567,89
+    // Remover pontos que são separadores de milhares (exceto o último ponto se não há vírgula)
     if (cleaned.includes(',')) {
-      // Se tem vírgula, assumir que é decimal brasileiro (ex: 14,97)
-      cleaned = cleaned.replace(',', '.');
+      // Se tem vírgula, os pontos são separadores de milhares
+      const parts = cleaned.split(',');
+      const integerPart = parts[0].replace(/\./g, ''); // Remove todos os pontos da parte inteira
+      const decimalPart = parts[1] || '0';
+      cleaned = integerPart + '.' + decimalPart;
+    } else if (cleaned.includes('.')) {
+      // Se não tem vírgula mas tem ponto, verificar se é decimal ou separador de milhares
+      const parts = cleaned.split('.');
+      if (parts.length === 2 && parts[1].length <= 2) {
+        // Provavelmente é decimal (ex: 1000.50)
+        cleaned = cleaned;
+      } else {
+        // Provavelmente são separadores de milhares (ex: 1.000.000)
+        cleaned = cleaned.replace(/\./g, '');
+      }
     }
+    
+    // Remover caracteres não numéricos exceto ponto decimal
+    cleaned = cleaned.replace(/[^\d.-]/g, '');
     
     const result = parseFloat(cleaned) || 0;
     return isNegative ? -result : result;
