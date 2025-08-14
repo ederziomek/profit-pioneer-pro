@@ -130,7 +130,6 @@ const createTablesIfNotExist = async () => {
     await neonClient.query(`
       CREATE TABLE IF NOT EXISTS transactions (
         id SERIAL PRIMARY KEY,
-        natural_key VARCHAR(255) UNIQUE NOT NULL,
         customer_id VARCHAR(255) NOT NULL,
         date TIMESTAMP NOT NULL,
         ggr DECIMAL(10,2) DEFAULT 0,
@@ -142,11 +141,43 @@ const createTablesIfNotExist = async () => {
     `);
     console.log('✅ Tabela transactions verificada/criada');
     
+    // Verificar se a coluna natural_key existe na tabela transactions
+    const checkNaturalKeyTx = await neonClient.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'transactions' 
+      AND column_name = 'natural_key'
+    `);
+    
+    if (checkNaturalKeyTx.rows.length === 0) {
+      console.log('🔧 Adicionando coluna natural_key à tabela transactions...');
+      await neonClient.query(`
+        ALTER TABLE transactions 
+        ADD COLUMN natural_key VARCHAR(255)
+      `);
+      
+      // Gerar natural_key para registros existentes (se houver)
+      await neonClient.query(`
+        UPDATE transactions 
+        SET natural_key = customer_id || '|' || date || '|' || ggr || '|' || deposit || '|' || withdrawal || '|' || id
+        WHERE natural_key IS NULL
+      `);
+      
+      // Adicionar constraint UNIQUE
+      await neonClient.query(`
+        ALTER TABLE transactions 
+        ADD CONSTRAINT transactions_natural_key_unique UNIQUE (natural_key)
+      `);
+      
+      console.log('✅ Coluna natural_key adicionada à tabela transactions');
+    } else {
+      console.log('✅ Coluna natural_key já existe na tabela transactions');
+    }
+    
     // Criar tabela de pagamentos
     await neonClient.query(`
       CREATE TABLE IF NOT EXISTS payments (
         id SERIAL PRIMARY KEY,
-        natural_key VARCHAR(255) UNIQUE NOT NULL,
         clientes_id VARCHAR(255),
         afiliados_id VARCHAR(255) NOT NULL,
         date TIMESTAMP NOT NULL,
@@ -159,6 +190,39 @@ const createTablesIfNotExist = async () => {
       )
     `);
     console.log('✅ Tabela payments verificada/criada');
+    
+    // Verificar se a coluna natural_key existe na tabela payments
+    const checkNaturalKeyPy = await neonClient.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'payments' 
+      AND column_name = 'natural_key'
+    `);
+    
+    if (checkNaturalKeyPy.rows.length === 0) {
+      console.log('🔧 Adicionando coluna natural_key à tabela payments...');
+      await neonClient.query(`
+        ALTER TABLE payments 
+        ADD COLUMN natural_key VARCHAR(255)
+      `);
+      
+      // Gerar natural_key para registros existentes (se houver)
+      await neonClient.query(`
+        UPDATE payments 
+        SET natural_key = COALESCE(clientes_id, 'null') || '|' || afiliados_id || '|' || date || '|' || value || '|' || id
+        WHERE natural_key IS NULL
+      `);
+      
+      // Adicionar constraint UNIQUE
+      await neonClient.query(`
+        ALTER TABLE payments 
+        ADD CONSTRAINT payments_natural_key_unique UNIQUE (natural_key)
+      `);
+      
+      console.log('✅ Coluna natural_key adicionada à tabela payments');
+    } else {
+      console.log('✅ Coluna natural_key já existe na tabela payments');
+    }
     
     // Verificar se as tabelas existem e contar registros
     const txCount = await neonClient.query('SELECT COUNT(*) as count FROM transactions');
