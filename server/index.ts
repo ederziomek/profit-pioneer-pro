@@ -895,6 +895,77 @@ app.get('/api/payments', async (req, res) => {
   }
 });
 
+// Rota de debug para verificar totais
+app.get('/api/debug/totals', async (req, res) => {
+  try {
+    const client = await getNeonClient();
+    
+    // Totais de transações
+    const transactionTotals = await client.query(`
+      SELECT 
+        COUNT(*) as total_records,
+        SUM(deposit) as total_deposit,
+        SUM(ggr) as total_ggr,
+        SUM(withdrawal) as total_withdrawal,
+        SUM(chargeback) as total_chargeback,
+        MAX(deposit) as max_deposit,
+        MAX(ggr) as max_ggr
+      FROM transactions
+    `);
+    
+    // Totais de pagamentos
+    const paymentTotals = await client.query(`
+      SELECT 
+        COUNT(*) as total_records,
+        SUM(value) as total_value,
+        MAX(value) as max_value
+      FROM payments
+    `);
+    
+    // Amostra de registros com valores altos
+    const sampleTransactions = await client.query(`
+      SELECT deposit, ggr, withdrawal, chargeback 
+      FROM transactions 
+      WHERE deposit > 100 OR ggr > 100
+      ORDER BY deposit DESC 
+      LIMIT 10
+    `);
+    
+    const tx = transactionTotals.rows[0];
+    const py = paymentTotals.rows[0];
+    
+    res.json({
+      transactions: {
+        count: parseInt(tx.total_records),
+        totalDeposit: parseFloat(tx.total_deposit || 0),
+        totalGGR: parseFloat(tx.total_ggr || 0),
+        totalWithdrawal: parseFloat(tx.total_withdrawal || 0),
+        totalChargeback: parseFloat(tx.total_chargeback || 0),
+        maxDeposit: parseFloat(tx.max_deposit || 0),
+        maxGGR: parseFloat(tx.max_ggr || 0)
+      },
+      payments: {
+        count: parseInt(py.total_records),
+        totalValue: parseFloat(py.total_value || 0),
+        maxValue: parseFloat(py.max_value || 0)
+      },
+      sampleHighValueTransactions: sampleTransactions.rows,
+      expectedValues: {
+        deposit: 8503883.29,
+        ggr: 2167277.88,
+        payments: 4587711.31
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar totais de debug:', error);
+    res.status(500).json({ 
+      error: 'Erro ao buscar totais de debug', 
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
 // Rota para resetar dados
 app.post('/api/reset', async (req, res) => {
   try {
