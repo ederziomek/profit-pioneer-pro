@@ -159,7 +159,7 @@ const createTablesIfNotExist = async () => {
       // Gerar natural_key para registros existentes (se houver)
       await neonClient.query(`
         UPDATE transactions 
-        SET natural_key = customer_id || '|' || date || '|' || ggr || '|' || deposit || '|' || withdrawal || '|' || id
+        SET natural_key = customer_id || '|' || date || '|' || ggr || '|' || chargeback || '|' || deposit || '|' || withdrawal || '|' || id
         WHERE natural_key IS NULL
       `);
       
@@ -552,7 +552,7 @@ app.post('/api/import/transactions', upload.single('file'), async (req, res) => 
     
     // Preparar dados para inserção
     const payload = rows.map((r, index) => ({
-      natural_key: `${r.customer_id}|${r.date.toISOString()}|${r.ggr}|${r.deposit}|${r.withdrawal}|${index}`,
+      natural_key: `${r.customer_id}|${r.date.toISOString()}|${r.ggr}|${r.chargeback}|${r.deposit}|${r.withdrawal}|${index}`,
       customer_id: r.customer_id,
       date: r.date.toISOString(),
       ggr: r.ggr,
