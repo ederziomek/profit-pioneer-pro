@@ -78,15 +78,15 @@ app.get('/health/simple', (req, res) => {
 // Configuração do multer para upload de arquivos
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Configuração do banco - priorizar NEON_DATABASE_URL onde os dados estão
-const DATABASE_URL = process.env.NEON_DATABASE_URL || 
-  process.env.DATABASE_URL || 
+// Configuração do banco - priorizar DATABASE_URL do Railway
+const DATABASE_URL = process.env.DATABASE_URL || 
+  process.env.NEON_DATABASE_URL || 
   "postgresql://neondb_owner:npg_SjN6yxOIKnc1@ep-green-surf-adprt5l3-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require";
 
 console.log('🔗 Configuração do banco:', {
   hasDatabase: !!DATABASE_URL,
   environment: process.env.NODE_ENV || 'development',
-  databaseSource: process.env.NEON_DATABASE_URL ? 'Neon' : (process.env.DATABASE_URL ? 'Railway' : 'Fallback')
+  databaseSource: process.env.DATABASE_URL ? 'Railway' : 'Neon'
 });
 
 // Cliente do banco
