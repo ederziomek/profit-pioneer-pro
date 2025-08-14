@@ -499,16 +499,31 @@ app.post('/api/import/transactions', upload.single('file'), async (req, res) => 
         RETURNING (xmax = 0) AS inserted
       `;
       
-      const result = await client.query(query, params);
+      console.log(`🔍 DEBUG - Executando query para ${chunk.length} registros`);
+      console.log(`🔍 DEBUG - Primeiros 3 parâmetros:`, params.slice(0, 21)); // 3 registros x 7 campos
       
-      // Contar inserções vs atualizações
-      const inserted = result.rows.filter(row => row.inserted).length;
-      const updated = result.rows.length - inserted;
-      
-      totalInserted += inserted;
-      totalUpdated += updated;
-      
-      console.log(`✅ Lote ${chunkIndex}/${totalChunks} concluído: ${inserted} inseridas, ${updated} atualizadas (Total: ${totalInserted + totalUpdated}/${records.length})`);
+      try {
+        const result = await client.query(query, params);
+        console.log(`🔍 DEBUG - Query executada com sucesso, ${result.rows.length} linhas retornadas`);
+        console.log(`🔍 DEBUG - Primeiras 3 linhas do resultado:`, result.rows.slice(0, 3));
+        
+        // Contar inserções vs atualizações
+        const inserted = result.rows.filter(row => row.inserted).length;
+        const updated = result.rows.length - inserted;
+        
+        totalInserted += inserted;
+        totalUpdated += updated;
+        
+        console.log(`✅ Lote ${chunkIndex}/${totalChunks} concluído: ${inserted} inseridas, ${updated} atualizadas (Total: ${totalInserted + totalUpdated}/${records.length})`);
+        
+        // Verificar se dados foram realmente inseridos
+        const verifyCount = await client.query('SELECT COUNT(*) as count FROM transactions');
+        console.log(`🔍 DEBUG - Total de transações na tabela após inserção: ${verifyCount.rows[0].count}`);
+        
+      } catch (queryError) {
+        console.error(`❌ ERRO na query do lote ${chunkIndex}:`, queryError);
+        throw queryError;
+      }
     }
 
     console.log(`🎉 Importação concluída: ${totalInserted} inseridas, ${totalUpdated} atualizadas`);
@@ -609,16 +624,31 @@ app.post('/api/import/payments', upload.single('file'), async (req, res) => {
         RETURNING (xmax = 0) AS inserted
       `;
       
-      const result = await client.query(query, params);
+      console.log(`🔍 DEBUG - Executando query de pagamentos para ${chunk.length} registros`);
+      console.log(`🔍 DEBUG - Primeiros 3 parâmetros:`, params.slice(0, 27)); // 3 registros x 9 campos
       
-      // Contar inserções vs atualizações
-      const inserted = result.rows.filter(row => row.inserted).length;
-      const updated = result.rows.length - inserted;
-      
-      totalInserted += inserted;
-      totalUpdated += updated;
-      
-      console.log(`✅ Lote ${chunkIndex}/${totalChunks} concluído: ${inserted} inseridos, ${updated} atualizados (Total: ${totalInserted + totalUpdated}/${records.length})`);
+      try {
+        const result = await client.query(query, params);
+        console.log(`🔍 DEBUG - Query de pagamentos executada com sucesso, ${result.rows.length} linhas retornadas`);
+        console.log(`🔍 DEBUG - Primeiras 3 linhas do resultado:`, result.rows.slice(0, 3));
+        
+        // Contar inserções vs atualizações
+        const inserted = result.rows.filter(row => row.inserted).length;
+        const updated = result.rows.length - inserted;
+        
+        totalInserted += inserted;
+        totalUpdated += updated;
+        
+        console.log(`✅ Lote ${chunkIndex}/${totalChunks} concluído: ${inserted} inseridos, ${updated} atualizados (Total: ${totalInserted + totalUpdated}/${records.length})`);
+        
+        // Verificar se dados foram realmente inseridos
+        const verifyCount = await client.query('SELECT COUNT(*) as count FROM payments');
+        console.log(`🔍 DEBUG - Total de pagamentos na tabela após inserção: ${verifyCount.rows[0].count}`);
+        
+      } catch (queryError) {
+        console.error(`❌ ERRO na query de pagamentos do lote ${chunkIndex}:`, queryError);
+        throw queryError;
+      }
     }
 
     console.log(`🎉 Importação concluída: ${totalInserted} inseridos, ${totalUpdated} atualizados`);
