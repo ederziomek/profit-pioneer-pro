@@ -295,8 +295,8 @@ const parseTransactionsFile = (buffer: Buffer) => {
   const dateIndex = getColumnIndex(['date', 'data']);
   const ggrIndex = getColumnIndex(['ggr']);
   const chargebackIndex = getColumnIndex(['chargeback']);
-  const depositIndex = getColumnIndex(['deposit', 'deposito', 'valor_deposito']);
-  const withdrawalIndex = getColumnIndex(['withdrawal', 'saque', 'valor_saque']);
+  const depositIndex = getColumnIndex(['valor_deposito', 'deposit', 'deposito']); // Priorizar valor_deposito
+  const withdrawalIndex = getColumnIndex(['valor_saque', 'withdrawal', 'saque']); // Priorizar valor_saque
   
   console.log('Mapeamento de colunas para transações:', {
     headers,
