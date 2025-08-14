@@ -347,6 +347,21 @@ const parseTransactionsFile = (buffer: Buffer) => {
   }).filter((t) => t.customer_id && !isNaN(t.date.getTime()));
   
   console.log(`🎯 Processamento concluído: ${results.length.toLocaleString()} registros válidos`);
+  
+  // Log de debug - mostrar primeiros 3 registros processados
+  if (results.length > 0) {
+    console.log('🔍 DEBUG - Primeiros 3 registros processados:');
+    for (let i = 0; i < Math.min(3, results.length); i++) {
+      const tx = results[i];
+      console.log(`  ${i+1}. Depósito: ${tx.deposit}, GGR: ${tx.ggr}, Saque: ${tx.withdrawal}`);
+    }
+    
+    // Mostrar valores máximos
+    const maxDeposit = Math.max(...results.map(tx => tx.deposit || 0));
+    const maxGGR = Math.max(...results.map(tx => tx.ggr || 0));
+    console.log(`🔍 DEBUG - Valores máximos: Depósito: ${maxDeposit}, GGR: ${maxGGR}`);
+  }
+  
   return results;
 };
 
