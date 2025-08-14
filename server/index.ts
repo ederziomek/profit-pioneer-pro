@@ -95,9 +95,14 @@ let neonClient: Client | null = null;
 const getNeonClient = async () => {
   if (!neonClient) {
     try {
+      // Configuração SSL mais robusta para Railway e outros provedores
+      const sslConfig = process.env.NODE_ENV === 'production' 
+        ? { rejectUnauthorized: false, require: true }
+        : false;
+        
       neonClient = new Client({ 
         connectionString: DATABASE_URL,
-        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+        ssl: sslConfig
       });
       await neonClient.connect();
       console.log('✅ Conectado ao banco de dados com sucesso');
@@ -119,6 +124,8 @@ const createTablesIfNotExist = async () => {
   if (!neonClient) return;
   
   try {
+    console.log('🔧 Verificando/criando tabelas...');
+    
     // Criar tabela de transações
     await neonClient.query(`
       CREATE TABLE IF NOT EXISTS transactions (
@@ -133,6 +140,7 @@ const createTablesIfNotExist = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    console.log('✅ Tabela transactions verificada/criada');
     
     // Criar tabela de pagamentos
     await neonClient.query(`
@@ -150,7 +158,13 @@ const createTablesIfNotExist = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    console.log('✅ Tabela payments verificada/criada');
     
+    // Verificar se as tabelas existem e contar registros
+    const txCount = await neonClient.query('SELECT COUNT(*) as count FROM transactions');
+    const pyCount = await neonClient.query('SELECT COUNT(*) as count FROM payments');
+    
+    console.log(`📊 Estado atual: ${txCount.rows[0].count} transações, ${pyCount.rows[0].count} pagamentos`);
     console.log('✅ Tabelas verificadas/criadas com sucesso');
     
   } catch (error) {
