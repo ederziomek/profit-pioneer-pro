@@ -132,14 +132,45 @@ const createTablesIfNotExist = async () => {
         id SERIAL PRIMARY KEY,
         customer_id VARCHAR(255) NOT NULL,
         date TIMESTAMP NOT NULL,
-        ggr DECIMAL(10,2) DEFAULT 0,
-        chargeback DECIMAL(10,2) DEFAULT 0,
-        deposit DECIMAL(10,2) DEFAULT 0,
-        withdrawal DECIMAL(10,2) DEFAULT 0,
+        ggr DECIMAL(15,2) DEFAULT 0,
+        chargeback DECIMAL(15,2) DEFAULT 0,
+        deposit DECIMAL(15,2) DEFAULT 0,
+        withdrawal DECIMAL(15,2) DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     console.log('✅ Tabela transactions verificada/criada');
+    
+    // Migração: Alterar colunas DECIMAL(10,2) para DECIMAL(15,2) se necessário
+    try {
+      console.log('🔧 Verificando se migração de DECIMAL é necessária...');
+      
+      const columnInfo = await neonClient.query(`
+        SELECT column_name, numeric_precision, numeric_scale 
+        FROM information_schema.columns 
+        WHERE table_name = 'transactions' 
+        AND column_name IN ('ggr', 'chargeback', 'deposit', 'withdrawal')
+        AND numeric_precision = 10
+      `);
+      
+      if (columnInfo.rows.length > 0) {
+        console.log('🔧 Executando migração para DECIMAL(15,2)...');
+        
+        await neonClient.query(`
+          ALTER TABLE transactions 
+          ALTER COLUMN ggr TYPE DECIMAL(15,2),
+          ALTER COLUMN chargeback TYPE DECIMAL(15,2),
+          ALTER COLUMN deposit TYPE DECIMAL(15,2),
+          ALTER COLUMN withdrawal TYPE DECIMAL(15,2)
+        `);
+        
+        console.log('✅ Migração DECIMAL(15,2) concluída com sucesso');
+      } else {
+        console.log('✅ Colunas já estão em DECIMAL(15,2)');
+      }
+    } catch (migrationError) {
+      console.log('⚠️ Erro na migração (pode ser normal se já foi aplicada):', migrationError);
+    }
     
     // Verificar se a coluna natural_key existe na tabela transactions
     const checkNaturalKeyTx = await neonClient.query(`
